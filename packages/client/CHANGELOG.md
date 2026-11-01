@@ -1,5 +1,11 @@
 # @seamless-auth/client
 
+## 0.8.2
+
+### Patch Changes
+
+- 204f112: Depend on `@seamless-auth/types` `^0.34.0`, the version the v0.21 auth API and server adapters are built on.
+
 ## 0.8.1
 
 ### Patch Changes
