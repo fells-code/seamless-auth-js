@@ -1,5 +1,12 @@
 # @seamless-auth/client
 
+## 0.8.3
+
+### Patch Changes
+
+- fc38203: Cookie transport now sends `x-seamless-auth-transport: cookie` on every unsafe request (`POST`, `PUT`, `PATCH`, `DELETE`) to the server adapter, including `POST /refresh` and requests `authorizedFetch` sends under the adapter's mount. Server adapters from v0.23 refuse a body-less unsafe auth request that carries neither a JSON content type nor this header with `415 unsupported_media_type`, so body-less calls such as recovery code generation and sign-out keep working. Safe methods and requests to the application's own routes are unchanged. A web app whose API is on another origin must allow the header in its CORS configuration; the starters already mirror requested headers.
+- 40cbf50: Depend on `@seamless-auth/types` `^0.35.0`, which adds the OpenID Provider session binding contract. Nothing the client packages use changed.
+
 ## 0.8.2
 
 ### Patch Changes
