@@ -111,8 +111,11 @@ and `startOAuthSignIn` reports it as a provider that would not start. A custom
 `createSeamlessAuthClient` takes a `transport` option:
 
 - cookie transport, the default: requests go to `${apiHost}/auth/*` with
-  `credentials: 'include'` and the server adapter holds the tokens. The browser
-  contract.
+  `credentials: 'include'` and the server adapter holds the tokens. Every unsafe
+  request (`POST`, `PUT`, `PATCH`, `DELETE`) to the adapter carries
+  `x-seamless-auth-transport: cookie`, which the adapter requires on a body-less
+  unsafe request. A web app on another origin than its API must allow that header
+  in its CORS configuration. The browser contract.
 - bearer transport (`{ mode: 'bearer', tokenStorage }`): the client holds the auth
   API's own tokens. Every request carries `x-seamless-auth-transport: bearer`;
   pre-auth routes carry the ephemeral token `/login` or `/registration/register`
