@@ -1,5 +1,14 @@
 # @seamless-auth/react
 
+## 0.19.3
+
+### Patch Changes
+
+- 40cbf50: Depend on `@seamless-auth/types` `^0.35.0`, which adds the OpenID Provider session binding contract. Nothing the client packages use changed.
+- Updated dependencies [fc38203]
+- Updated dependencies [40cbf50]
+  - @seamless-auth/client@0.8.3
+
 ## 0.19.2
 
 ### Patch Changes
