@@ -66,7 +66,7 @@
 .button {
   width: 100%;
   padding: 0.75rem 1rem;
-  background-color: var(--seamless-accent, #059669);
+  background-color: var(--seamless-accent, #047857);
   color: var(--seamless-accent-contrast, white);
   border: none;
   border-radius: 0.5rem;
@@ -76,7 +76,7 @@
 }
 
 .button:hover {
-  background-color: var(--seamless-accent-hover, #047857);
+  background-color: var(--seamless-accent-hover, #065f46);
 }
 
 .message {
@@ -85,18 +85,18 @@
 }
 
 .success {
-  color: var(--seamless-success, #6ee7b7);
+  color: var(--seamless-success, #047857);
 }
 
 .error {
-  color: var(--seamless-danger, #f87171);
+  color: var(--seamless-danger, #b91c1c);
 }
 
 .skip {
   margin-top: 1.5rem;
   width: 100%;
   font-size: 0.875rem;
-  color: var(--seamless-accent-soft, #60a5fa);
+  color: var(--seamless-accent-soft, #1d4ed8);
   text-align: center;
   background: none;
   border: none;
@@ -113,8 +113,8 @@
   width: 100%;
   padding: 0.75rem 1rem;
   background: none;
-  color: var(--seamless-accent, #059669);
-  border: 1px solid var(--seamless-accent, #059669);
+  color: var(--seamless-accent, #047857);
+  border: 1px solid var(--seamless-accent, #047857);
   border-radius: 0.5rem;
   font-weight: 500;
   cursor: pointer;
@@ -122,7 +122,7 @@
 }
 
 .secondary:hover:not(:disabled) {
-  background-color: var(--seamless-accent-muted, rgba(5, 150, 105, 0.1));
+  background-color: var(--seamless-accent-muted, rgba(4, 120, 87, 0.1));
 }
 
 .secondary:disabled {

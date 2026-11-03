@@ -11,7 +11,7 @@
   text-align: center;
   font-size: 1.2rem;
   border-radius: 8px;
-  border: 1px solid var(--seamless-border, #4b5563);
+  border: 1px solid var(--seamless-border, #9ca3af);
   background: var(--seamless-surface-raised, #374151);
   color: var(--seamless-text, white);
   transition:

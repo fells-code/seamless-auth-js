@@ -211,3 +211,43 @@ describe('recovery codes meet WCAG 2.2 AA', () => {
     await expectAccessible(container, stylesheet);
   });
 });
+
+// The same defaults appear on screens that share the recovery palette. These are
+// declaration pairs rather than renders, as each needs only its card behind it.
+describe('other bundled screens keep AA defaults', () => {
+  const colorIn = (value: string | undefined) =>
+    parseColor(
+      value?.match(/#[0-9a-f]{3,6}\b|rgba?\([^)]*\)|\bwhite\b/i)?.[0] ?? ''
+    ) as Rgba;
+
+  const account = loadStylesheet('accountSecurity.module.css');
+  const verify = loadStylesheet('verifyOTP.module.css');
+  const otp = loadStylesheet('otpInput.module.css');
+  const accountCard = colorIn(account.base.get('section')?.['background-color']);
+  const verifyCard = colorIn(verify.base.get('card')?.['background-color']);
+
+  it.each([
+    [
+      'account security primary button',
+      colorIn(account.base.get('button')?.color),
+      colorIn(account.base.get('button')?.['background-color']),
+      4.5,
+    ],
+    [
+      'account security secondary button',
+      colorIn(account.base.get('secondary')?.color),
+      accountCard,
+      4.5,
+    ],
+    [
+      'code entry resend link on hover',
+      colorIn(verify.hover.get('resend')?.color),
+      verifyCard,
+      4.5,
+    ],
+    // WCAG 1.4.11: the border is what identifies each code box against the card.
+    ['code entry box boundary', colorIn(otp.base.get('otpInput')?.border), verifyCard, 3],
+  ])('%s', (_name, foreground, background, required) => {
+    expect(contrastRatio(foreground, background)).toBeGreaterThanOrEqual(required);
+  });
+});
