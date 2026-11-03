@@ -94,8 +94,117 @@ describe('cookie transport', () => {
     expect(headersOf(calls[0])).toEqual({});
 
     expect(calls[1].url).toBe(`${API}/auth/login`);
-    expect(headersOf(calls[1])).toEqual({ 'Content-Type': 'application/json' });
+    expect(headersOf(calls[1])).toEqual({
+      'Content-Type': 'application/json',
+      [AUTH_TRANSPORT_HEADER]: 'cookie',
+    });
     expect(transport.mode).toBe('cookie');
+  });
+
+  // The adapter refuses a body-less unsafe request that names neither a JSON
+  // body nor a transport, so every unsafe request names cookie transport.
+  it.each(['POST', 'PUT', 'PATCH', 'DELETE', 'delete'])(
+    'marks a body-less %s with the cookie transport header',
+    async method => {
+      const { calls, fetchImpl } = scriptedFetch(() => jsonResponse(200, {}));
+      const transport = createTransport({ apiHost: API, fetch: fetchImpl });
+
+      await transport.fetch('/recovery-codes', { method });
+
+      expect(calls[0].init.credentials).toBe('include');
+      expect(headersOf(calls[0])).toEqual({ [AUTH_TRANSPORT_HEADER]: 'cookie' });
+    }
+  );
+
+  // A header on a cross-origin GET would make it preflighted for nothing.
+  it.each(['GET', 'HEAD', 'OPTIONS', undefined])(
+    'leaves a %s request unmarked',
+    async method => {
+      const { calls, fetchImpl } = scriptedFetch(() => jsonResponse(200, {}));
+      const transport = createTransport({ apiHost: API, fetch: fetchImpl });
+
+      await transport.fetch('/users/me', method ? { method } : undefined);
+
+      expect(headersOf(calls[0])).toEqual({});
+    }
+  );
+
+  it('lets the caller override the transport header', async () => {
+    const { calls, fetchImpl } = scriptedFetch(() => jsonResponse(200, {}));
+    const transport = createTransport({ apiHost: API, fetch: fetchImpl });
+
+    await transport.fetch('/logout', {
+      method: 'DELETE',
+      headers: new Headers({ [AUTH_TRANSPORT_HEADER]: 'custom' }),
+    });
+
+    expect(headersOf(calls[0])).toEqual({ [AUTH_TRANSPORT_HEADER]: 'custom' });
+  });
+
+  it('refreshes through POST /refresh with the cookie transport header', async () => {
+    const { calls, fetchImpl } = scriptedFetch(() => jsonResponse(200, {}));
+    const transport = createTransport({ apiHost: API, fetch: fetchImpl });
+
+    await expect(transport.refresh()).resolves.toBe(true);
+
+    expect(calls[0].url).toBe(`${API}/auth/refresh`);
+    expect(calls[0].init.method).toBe('POST');
+    expect(calls[0].init.credentials).toBe('include');
+    expect(headersOf(calls[0])).toEqual({ [AUTH_TRANSPORT_HEADER]: 'cookie' });
+  });
+
+  it('authorizedFetch marks an unsafe request under the adapter mount only', async () => {
+    const { calls, fetchImpl } = scriptedFetch(() => jsonResponse(200, {}));
+    const transport = createTransport({
+      apiHost: API,
+      fetch: fetchImpl,
+      trustedOrigins: ['https://data.example.com'],
+    });
+
+    await transport.authorizedFetch(`${API}/auth/sessions/s-1`, { method: 'DELETE' });
+    await transport.authorizedFetch(`${API}/auth/sessions`);
+    await transport.authorizedFetch(`${API}/api/plan`, { method: 'DELETE' });
+    await transport.authorizedFetch('https://data.example.com/auth/x', {
+      method: 'POST',
+    });
+
+    expect(calls.map(call => call.url)).toEqual([
+      `${API}/auth/sessions/s-1`,
+      `${API}/auth/sessions`,
+      `${API}/api/plan`,
+      'https://data.example.com/auth/x',
+    ]);
+    expect(calls.every(call => call.init.credentials === 'include')).toBe(true);
+    expect(headersOf(calls[0])).toEqual({ [AUTH_TRANSPORT_HEADER]: 'cookie' });
+    expect(headersOf(calls[1])).toEqual({});
+    expect(headersOf(calls[2])).toEqual({});
+    expect(headersOf(calls[3])).toEqual({});
+  });
+
+  it('authorizedFetch finds the adapter mount on the page origin when apiHost is empty', async () => {
+    const { calls, fetchImpl } = scriptedFetch(() => jsonResponse(200, {}));
+    const previous = (globalThis as { location?: unknown }).location;
+    (globalThis as { location?: unknown }).location = {
+      origin: 'https://app.example.com',
+    };
+
+    try {
+      const transport = createTransport({ apiHost: '', fetch: fetchImpl });
+
+      await transport.authorizedFetch('https://app.example.com/auth/sessions/s-1', {
+        method: 'DELETE',
+      });
+      await transport.authorizedFetch('https://app.example.com/api/thing', {
+        method: 'DELETE',
+      });
+
+      expect(calls[0].url).toBe('/auth/sessions/s-1');
+      expect(headersOf(calls[0])).toEqual({ [AUTH_TRANSPORT_HEADER]: 'cookie' });
+      expect(calls[1].url).toBe('https://app.example.com/api/thing');
+      expect(headersOf(calls[1])).toEqual({});
+    } finally {
+      (globalThis as { location?: unknown }).location = previous;
+    }
   });
 
   // An empty apiHost is the same-origin setup (an app serving /auth itself), so

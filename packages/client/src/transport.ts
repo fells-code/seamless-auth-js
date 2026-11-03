@@ -325,6 +325,20 @@ function withHeaders(
   return { ...init, headers };
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * The adapter refuses a body-less unsafe request that carries neither a JSON
+ * content type nor the transport header, since that is what a cross-site form
+ * can send. Cookie transport names itself on those requests so a body-less
+ * POST or DELETE passes. Safe methods go without it, so a cross-origin GET
+ * stays a simple request with no preflight.
+ */
+function cookieTransportMark(init: RequestInit | undefined): Record<string, string> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  return SAFE_METHODS.has(method) ? {} : { [AUTH_TRANSPORT_HEADER]: 'cookie' };
+}
+
 interface SessionBody {
   token?: unknown;
   refreshToken?: unknown;
@@ -377,25 +391,37 @@ export function createTransport(options: TransportOptions): Transport {
     return refuseUntrusted(url) ?? url;
   };
 
+  // An empty apiHost is this page's origin, and authorizedFetch only takes an
+  // absolute URL, so the mount is matched against that origin.
+  const mount = `${buildUrl(
+    options.apiHost.trim() === '' ? (pageOrigin() ?? '') : options.apiHost,
+    basePath,
+    ''
+  )}/`;
+
   if (mode === 'cookie') {
+    const fetchUnderMount: FetchWithAuth = (input, init) =>
+      fetchImpl(
+        buildUrl(options.apiHost, basePath, normalizePath(input)),
+        withHeaders({ ...init, credentials: 'include' }, cookieTransportMark(init))
+      );
+
     return {
       mode,
-      fetch: (input, init) =>
-        fetchImpl(
-          buildUrl(options.apiHost, basePath, normalizePath(input)),
-          withHeaders({ ...init, credentials: 'include' }, {})
-        ),
+      fetch: fetchUnderMount,
+      // The application's own routes are left as the caller built them: the
+      // transport header is the adapter's, and a custom header there would only
+      // add a CORS preflight the application's API may not allow.
       authorizedFetch: (input, init) => {
         const url = checkedUrl(input);
         if (typeof url !== 'string') return url;
 
-        return fetchImpl(url, withHeaders({ ...init, credentials: 'include' }, {}));
+        return url.startsWith(mount)
+          ? fetchUnderMount(url.slice(mount.length - 1), init)
+          : fetchImpl(url, withHeaders({ ...init, credentials: 'include' }, {}));
       },
       refresh: async () => {
-        const response = await fetchImpl(
-          buildUrl(options.apiHost, basePath, '/refresh'),
-          withHeaders({ method: 'POST', credentials: 'include' }, {})
-        );
+        const response = await fetchUnderMount('/refresh', { method: 'POST' });
         return response.ok;
       },
       clearTokens: async () => undefined,
@@ -632,8 +658,6 @@ export function createTransport(options: TransportOptions): Transport {
 
     return response;
   }
-
-  const mount = `${buildUrl(options.apiHost, basePath, '')}/`;
 
   const fetchUnderMount: FetchWithAuth = async (input, init) => {
     const path = normalizePath(input);

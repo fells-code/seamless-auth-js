@@ -1376,8 +1376,10 @@ This package assumes a Seamless Auth-compatible backend with the auth adapter mo
 
 - Requests target `${apiHost}/auth/...`
 - `apiHost` may be provided with or without a trailing slash
-- In cookie transport (the default) requests are sent with `credentials: 'include'`; in bearer
-  transport they carry `x-seamless-auth-transport: bearer` and an `Authorization` header instead
+- In cookie transport (the default) requests are sent with `credentials: 'include'`, and unsafe
+  requests (`POST`, `PUT`, `PATCH`, `DELETE`) carry `x-seamless-auth-transport: cookie`, so a
+  cross-origin backend's CORS configuration must allow that header; in bearer transport they carry
+  `x-seamless-auth-transport: bearer` and an `Authorization` header instead
 - `AuthProvider` validates the current session by calling `/users/me` on load
 - Bearer transport additionally uses `POST /refresh`
 
