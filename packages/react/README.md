@@ -1333,29 +1333,37 @@ There is no provider prop or JavaScript API for this. Setting the variables is t
 
 ### Tokens
 
-| Token                        | Used for                                                               | Default                                       |
-| ---------------------------- | ---------------------------------------------------------------------- | --------------------------------------------- |
-| `--seamless-accent`          | Primary buttons, focus rings, selected states, accent borders, spinner | `#2563eb` fills, `#3b82f6` rings and borders  |
-| `--seamless-accent-hover`    | Hover state of primary buttons                                         | `#1d4ed8`                                     |
-| `--seamless-accent-contrast` | Label text on accent-filled buttons                                    | `white`                                       |
-| `--seamless-accent-soft`     | Links, toggle buttons, accent icons                                    | `#60a5fa`, `#a5b4fc` on the magic-link screen |
-| `--seamless-surface`         | Card and modal backgrounds                                             | `#1f2937`                                     |
-| `--seamless-surface-raised`  | Inputs and panels sitting on a card                                    | `#374151`, `#4b5563` on the login form        |
-| `--seamless-surface-hover`   | Hover state of secondary buttons                                       | `#4b5563`                                     |
-| `--seamless-border`          | Input, button, and panel borders                                       | `#4b5563`, `#d1d5db`                          |
-| `--seamless-text`            | Headings and body text                                                 | `white`                                       |
-| `--seamless-text-muted`      | Labels, helper text, secondary copy                                    | `#9ca3af`, `#d1d5db`                          |
-| `--seamless-danger`          | Error messages                                                         | `#f87171`                                     |
-| `--seamless-success`         | Success messages and the verified check icon                           | `#34d399`                                     |
-| `--seamless-warning`         | OTP countdown and resend timers                                        | `#facc15`                                     |
-| `--seamless-overlay`         | Modal backdrop scrim                                                   | `rgba(0, 0, 0, 0.45)`                         |
-| `--seamless-shadow`          | Card and modal shadow colour                                           | `rgba(0, 0, 0, 0.1)` to `rgba(0, 0, 0, 0.4)`  |
+| Token                        | Used for                                                                                     | Default                                                                                                  |
+| ---------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `--seamless-accent`          | Primary buttons, focus rings, selected states, accent borders, outlined button text, spinner | `#2563eb` fills (`#047857` on the passkey enrollment panel), `#3b82f6` rings, `#60a5fa` outlined buttons |
+| `--seamless-accent-hover`    | Hover state of primary buttons                                                               | `#1d4ed8`, `#065f46` on the passkey enrollment panel                                                     |
+| `--seamless-accent-contrast` | Label text on accent-filled buttons                                                          | `white`                                                                                                  |
+| `--seamless-accent-soft`     | Links, toggle buttons, accent icons                                                          | `#60a5fa`, `#a5b4fc` on the magic-link screen, `#1d4ed8` on the passkey enrollment panel                 |
+| `--seamless-accent-muted`    | Hover tint behind outlined buttons on the passkey enrollment panel                           | `rgba(4, 120, 87, 0.1)`                                                                                  |
+| `--seamless-surface`         | Card and modal backgrounds                                                                   | `#1f2937`                                                                                                |
+| `--seamless-surface-raised`  | Inputs and panels sitting on a card                                                          | `#374151`, `#4b5563` on the login form                                                                   |
+| `--seamless-surface-hover`   | Hover state of secondary buttons                                                             | `#4b5563`                                                                                                |
+| `--seamless-border`          | Input, button, and panel borders                                                             | `#4b5563`, `#d1d5db`, `#9ca3af` on code entry boxes                                                      |
+| `--seamless-text`            | Headings and body text                                                                       | `white`                                                                                                  |
+| `--seamless-text-muted`      | Labels, helper text, secondary copy                                                          | `#9ca3af`, `#d1d5db`                                                                                     |
+| `--seamless-danger`          | Error messages                                                                               | `#f87171`, `#b91c1c` on the passkey enrollment panel                                                     |
+| `--seamless-success`         | Success messages and the verified check icon                                                 | `#34d399`, `#047857` on the passkey enrollment panel                                                     |
+| `--seamless-warning`         | OTP countdown and resend timers                                                              | `#facc15`                                                                                                |
+| `--seamless-overlay`         | Modal backdrop scrim                                                                         | `rgba(0, 0, 0, 0.45)`                                                                                    |
+| `--seamless-shadow`          | Card and modal shadow colour                                                                 | `rgba(0, 0, 0, 0.1)` to `rgba(0, 0, 0, 0.4)`                                                             |
 
 ### Notes
 
 - Where the original design used near-duplicate shades for the same role, each declaration keeps its
   own original value as the fallback. That is why some rows list more than one default. Nothing shifts
   until you set the token, and once you do, every use of that role picks up your value.
+- The defaults meet WCAG 2.2 AA contrast: 4.5:1 for text and 3:1 for the boundaries that identify
+  a control, at rest and on hover. The package tests check the passkey enrollment and recovery
+  code screens against them. Your overrides are yours to check against the same bar.
+- The passkey enrollment panel is light by default (`#ecfdf5` with `#065f46` text) while every other
+  card is dark. A token used on both, such as `--seamless-accent-soft`, `--seamless-success`, or
+  `--seamless-danger`, has to read against both backgrounds, or set `--seamless-surface` and
+  `--seamless-text` too so the panel matches the rest.
 - `--seamless-shadow` is the shadow colour only. Offsets and blur are fixed. Setting it applies one
   colour to every shadow in the built-in UI, replacing the per-screen alpha values.
 - If you set `--seamless-surface` to a light colour, set `--seamless-text` too. The default text

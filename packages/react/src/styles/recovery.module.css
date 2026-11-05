@@ -58,7 +58,7 @@
 .button {
   width: 100%;
   padding: 0.75rem 1rem;
-  background-color: var(--seamless-accent, #3b82f6);
+  background-color: var(--seamless-accent, #2563eb);
   color: var(--seamless-accent-contrast, white);
   border: none;
   border-radius: 0.5rem;
@@ -67,7 +67,7 @@
 }
 
 .button:hover:not(:disabled) {
-  background-color: var(--seamless-accent-hover, #2563eb);
+  background-color: var(--seamless-accent-hover, #1d4ed8);
 }
 
 .button:disabled {
@@ -79,8 +79,8 @@
   width: 100%;
   padding: 0.75rem 1rem;
   background: none;
-  color: var(--seamless-accent, #3b82f6);
-  border: 1px solid var(--seamless-accent, #3b82f6);
+  color: var(--seamless-accent, #60a5fa);
+  border: 1px solid var(--seamless-accent, #60a5fa);
   border-radius: 0.5rem;
   font-weight: 500;
   cursor: pointer;
