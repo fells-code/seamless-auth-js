@@ -125,7 +125,10 @@ that package rather than redeclaring shapes.
 Rules for this dependency:
 
 - types only. Import with `import type` so the package's Zod dependency never
-  reaches the browser bundle. There is a `Record<OAuthErrorCode, true>` in
+  reaches the browser bundle. The one runtime import is the Zod-free
+  `@seamless-auth/types/permission/matching` in `packages/client/src/permissions.ts`,
+  which is external in the client build and mapped in each Jest config. Nothing
+  checks this automatically, so never import the package root at runtime. There is a `Record<OAuthErrorCode, true>` in
   `packages/client/src/client/errors.ts` that exists for exactly this reason: it is a
   compile-time membership check standing in for the upstream runtime list.
 - keep the SDK's own export names. Adopters import `Credential` from this
@@ -158,6 +161,7 @@ Runtime exports currently include:
 - `useAuthClient`
 - `usePasskeySupport`
 - `hasScopedRole` and `roleGrantsAccess`
+- `hasPermission`, `hasAllPermissions`, `hasRole`, `hasOrganizationRole`, and `usePermissions` (React only). `hasRole` is instance roles with scoped matching, unlike the exact `useAuth().hasRole`
 - `encodePrfSalt`, `extractPasskeyPrfResult`, and `isPasskeyPrfSupported`
 - `SeamlessAuthError`, `getOAuthErrorCode`, `getPasskeyPolicyErrorCode`, and `getWebAuthnErrorDetail`
 
@@ -220,6 +224,9 @@ This repository is an npm workspace. Its published packages include:
   - `/auth` request construction
 - `src/scopedRoles.ts`
   - role matching, kept byte-for-byte with `@seamless-auth/types/role/matching`
+- `src/permissions.ts`
+  - UI-only checks over the `/users/me` user: exact permission and organization role
+    matching, scoped instance roles, false for anything an older API leaves out
 - `src/types.ts`
   - aliases of the wire contract in `@seamless-auth/types`, not hand-written shapes
 
@@ -232,6 +239,8 @@ This repository is an npm workspace. Its published packages include:
   - creates a memoized client from provider configuration
 - `src/hooks/usePasskeySupport.ts`
   - exposes browser support detection for passkeys
+- `src/hooks/usePermissions.ts`
+  - permission and role checks bound to the provider's current user
 - `src/AuthRoutes.tsx`
   - bundles the prebuilt auth route flow
 - `src/routes.ts`

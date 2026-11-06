@@ -13,10 +13,19 @@ export default {
   rootDir: '.',
   setupFilesAfterEnv: ['<rootDir>/../../jest.setup.ts'],
   transform: {
+    '/node_modules/@seamless-auth/types/.+\\.js$': [
+      'ts-jest',
+      { tsconfig: { allowJs: true } },
+    ],
     '^.+\\.(t|j)sx?$': ['ts-jest', { useESM: true, tsconfig: '<rootDir>/tsconfig.json' }],
   },
+  transformIgnorePatterns: ['/node_modules/(?!@seamless-auth/types/)'],
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
+    // `@seamless-auth/types` ships ESM under the `import` condition alone, which
+    // Jest's CommonJS resolver cannot read.
+    '^@seamless-auth/types/permission/matching$':
+      '<rootDir>/../../node_modules/@seamless-auth/types/dist/schemas/permission/matching.js',
     '^@shared-styles/seamless-auth\\.css$': '<rootDir>/tests/styleStub.ts',
     '^@/(.*)$': '<rootDir>/src/$1',
     // Tests run against the client source, so a change in the core is exercised

@@ -16,7 +16,11 @@ export default [
       format: 'esm',
       sourcemap: true,
     },
-    external: ['@simplewebauthn/browser', 'libphonenumber-js'],
+    external: [
+      '@seamless-auth/types/permission/matching',
+      '@simplewebauthn/browser',
+      'libphonenumber-js',
+    ],
     plugins: [
       alias({
         entries: [{ find: '@', replacement: path.resolve(__dirname, 'src') }],

@@ -147,6 +147,14 @@ fetch for your own API that carries the cookies to `apiHost` and `trustedOrigins
 (the headless client for everything else, such as OTP and magic link calls), `ports`, and
 `destroy()`.
 
+### Permissions and organization roles
+
+`hasPermission(user, required, { scope? })`, `hasAllPermissions`, `hasRole` (instance roles, scoped
+matching) and `hasOrganizationRole` (active organization, exact matching) are exported for showing
+and hiding UI. They are for UI only: the server must still enforce. They reflect the last
+`/users/me` read, so a change reaches the client when the user is next refreshed. See the
+[`@seamless-auth/client` README](../client/README.md#permissions-and-roles).
+
 ## Guards
 
 `@seamless-auth/svelte/kit` exports `load` functions. They wait for the session to be read before

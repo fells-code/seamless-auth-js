@@ -126,6 +126,14 @@ client has the recovery code and account recovery methods. After a passkey is en
 from a recovery session the client refreshes the stored tokens, so the new access token
 no longer carries the recovery claim. See the client README for the full list.
 
+### Permissions and organization roles
+
+`hasPermission`, `hasAllPermissions`, `hasRole` (instance roles, scoped matching) and
+`hasOrganizationRole` (active organization, exact matching) take the user first, such as
+`hasPermission(useAuth().user, 'reports:read')`. They are for UI only: the server must still enforce.
+They reflect the last `/users/me` read, so a change reaches the client when the user is next
+refreshed. See the [`@seamless-auth/client` README](../client/README.md#permissions-and-roles).
+
 ### Passkeys
 
 Native passkeys need the relying party to be an associated domain of the app:

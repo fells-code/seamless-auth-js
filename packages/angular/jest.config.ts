@@ -13,13 +13,21 @@ export default {
   rootDir: '.',
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   transform: {
+    '/node_modules/@seamless-auth/types/.+\\.js$': [
+      'ts-jest',
+      { tsconfig: { allowJs: true } },
+    ],
     '^.+\\.(ts|mjs|js|html)$': [
       'jest-preset-angular',
       { tsconfig: '<rootDir>/tsconfig.spec.json', stringifyContentPathRegex: '\\.html$' },
     ],
   },
-  transformIgnorePatterns: ['node_modules/(?!.*\\.mjs$)'],
+  transformIgnorePatterns: ['node_modules/(?!(.*\\.mjs$|@seamless-auth/types/))'],
   moduleNameMapper: {
+    // `@seamless-auth/types` ships ESM under the `import` condition alone, which
+    // Jest's CommonJS resolver cannot read.
+    '^@seamless-auth/types/permission/matching$':
+      '<rootDir>/../../node_modules/@seamless-auth/types/dist/schemas/permission/matching.js',
     // Tests run against the sources, so a change in the core is exercised here
     // without a build in between.
     '^@seamless-auth/angular$': '<rootDir>/src/index.ts',
