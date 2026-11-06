@@ -36,7 +36,7 @@ describe('hasPermission', () => {
 
   it('answers false rather than throwing for an older API response', () => {
     expect(hasPermission(olderApiUser, 'reports:read')).toBe(false);
-    expect(hasPermission(olderApiUser, 'reports:read', { scope: 'organization' })).toBe(
+    expect(hasPermission(olderApiUser, 'reports:read', { organization: true })).toBe(
       false
     );
   });
@@ -66,11 +66,12 @@ describe('hasPermission', () => {
     expect(hasPermission(user, 'projects:read')).toBe(false);
   });
 
-  it('counts only the active organization with the organization scope', () => {
-    const options = { scope: 'organization' } as const;
+  it('counts only the active organization with the organization option', () => {
+    const options = { organization: true } as const;
 
     expect(hasPermission(user, 'projects:write', options)).toBe(true);
     expect(hasPermission(user, 'reports:read', options)).toBe(false);
+    expect(hasPermission(user, 'reports:read', { organization: false })).toBe(true);
   });
 
   it('passes when any of several permissions is held', () => {
@@ -86,15 +87,13 @@ describe('hasAllPermissions', () => {
     expect(hasAllPermissions(user, ['reports:read', 'nope'])).toBe(false);
   });
 
-  it('respects the organization scope', () => {
+  it('respects the organization option', () => {
     expect(
       hasAllPermissions(user, ['reports:read', 'projects:write'], {
-        scope: 'organization',
+        organization: true,
       })
     ).toBe(false);
-    expect(hasAllPermissions(user, 'projects:write', { scope: 'organization' })).toBe(
-      true
-    );
+    expect(hasAllPermissions(user, 'projects:write', { organization: true })).toBe(true);
   });
 
   it('refuses an empty requirement and missing fields', () => {

@@ -25,10 +25,10 @@ export type UserAuthorization = Partial<
 
 export interface PermissionCheckOptions {
   /**
-   * `'organization'` counts only what the active organization grants, leaving out
+   * `true` counts only what the active organization grants, leaving out
    * instance-wide permissions. By default a permission is held if either grants it.
    */
-  scope?: 'organization';
+  organization?: boolean;
 }
 
 function heldPermissions(
@@ -38,7 +38,7 @@ function heldPermissions(
   const list = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
   const organization = list(user?.organizationPermissions);
 
-  return options?.scope === 'organization'
+  return options?.organization
     ? organization
     : [...list(user?.permissions), ...organization];
 }

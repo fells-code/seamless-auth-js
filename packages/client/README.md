@@ -117,7 +117,7 @@ client never decodes a token.
 
 ```ts
 hasPermission(user, 'reports:read'); // instance or active organization grant
-hasPermission(user, 'projects:write', { scope: 'organization' }); // active organization only
+hasPermission(user, 'projects:write', { organization: true }); // active organization only
 hasAllPermissions(user, ['reports:read', 'projects:write']);
 hasRole(user, 'admin:read'); // instance roles, scoped like hasScopedRole
 hasOrganizationRole(user, ['owner', 'admin']); // active organization roles, exact

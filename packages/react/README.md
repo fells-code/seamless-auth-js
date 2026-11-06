@@ -413,17 +413,17 @@ function ReportsLink() {
 }
 ```
 
-| Check                                                | Reads                                                 | Matching                 |
-| ---------------------------------------------------- | ----------------------------------------------------- | ------------------------ |
-| `hasPermission(required)`                            | `permissions` and `organizationPermissions`           | exact, any of `required` |
-| `hasPermission(required, { scope: 'organization' })` | `organizationPermissions` only                        | exact, any of `required` |
-| `hasAllPermissions(required, options?)`              | the same, with the same `scope` option                | exact, all of `required` |
-| `hasRole(required)`                                  | `roles`, the instance roles                           | scoped (`hasScopedRole`) |
-| `hasOrganizationRole(required)`                      | `organizationRoles`, roles in the active organization | exact, any of `required` |
+| Check                                             | Reads                                                 | Matching                 |
+| ------------------------------------------------- | ----------------------------------------------------- | ------------------------ |
+| `hasPermission(required)`                         | `permissions` and `organizationPermissions`           | exact, any of `required` |
+| `hasPermission(required, { organization: true })` | `organizationPermissions` only                        | exact, any of `required` |
+| `hasAllPermissions(required, options?)`           | the same, with the same `organization` option         | exact, all of `required` |
+| `hasRole(required)`                               | `roles`, the instance roles                           | scoped (`hasScopedRole`) |
+| `hasOrganizationRole(required)`                   | `organizationRoles`, roles in the active organization | exact, any of `required` |
 
 - Permission matching is exact, with no wildcards or implied grants: `invoices:write` does not
   satisfy `invoices:read`. A permission is held if either the instance or the active organization
-  grants it, the same union the server guard uses by default. The `organization` scope leaves out
+  grants it, the same union the server guard uses by default. The `organization` option leaves out
   instance-wide grants.
 - Instance and organization roles stay apart. An organization `admin` does not satisfy
   `hasRole('admin')`, and an instance `admin` does not satisfy `hasOrganizationRole('admin')`.

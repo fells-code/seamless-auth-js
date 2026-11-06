@@ -84,9 +84,7 @@ describe('usePermissions', () => {
     expect(permissions.activeOrganizationId).toBe('org-1');
 
     expect(permissions.hasPermission('reports:read')).toBe(true);
-    expect(permissions.hasPermission('reports:read', { scope: 'organization' })).toBe(
-      false
-    );
+    expect(permissions.hasPermission('reports:read', { organization: true })).toBe(false);
     expect(permissions.hasAllPermissions(['reports:read', 'projects:write'])).toBe(true);
     expect(permissions.hasOrganizationRole('admin')).toBe(true);
     expect(permissions.hasRole('admin')).toBe(false);

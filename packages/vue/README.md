@@ -121,7 +121,7 @@ fetch for your own API that carries the cookies to `apiHost` and `trustedOrigins
 
 ### Permissions and organization roles
 
-`hasPermission(user, required, { scope? })`, `hasAllPermissions`, `hasRole` (instance roles, scoped
+`hasPermission(user, required, { organization? })`, `hasAllPermissions`, `hasRole` (instance roles, scoped
 matching) and `hasOrganizationRole` (active organization, exact matching) are exported for showing
 and hiding UI. They are for UI only: the server must still enforce. They reflect the last
 `/users/me` read, so a change reaches the client when the user is next refreshed. See the
