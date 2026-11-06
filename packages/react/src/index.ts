@@ -85,8 +85,17 @@ import { useAuthClient } from '@/hooks/useAuthClient';
 import { useAuthorizedFetch } from '@/hooks/useAuthorizedFetch';
 import { hasNonPasskeyLoginMethod, useLoginMethods } from '@/hooks/useLoginMethods';
 import { usePasskeySupport } from '@/hooks/usePasskeySupport';
+import { usePermissions, type UsePermissionsResult } from '@/hooks/usePermissions';
 import { useRecoveryOptions } from '@/hooks/useRecoveryOptions';
-import { hasScopedRole, roleGrantsAccess } from '@seamless-auth/client';
+import {
+  hasAllPermissions,
+  hasOrganizationRole,
+  hasPermission,
+  hasRole,
+  hasScopedRole,
+  roleGrantsAccess,
+} from '@seamless-auth/client';
+import type { PermissionCheckOptions, UserAuthorization } from '@seamless-auth/client';
 import {
   formatTotpSecret,
   qrCode,
@@ -124,7 +133,11 @@ export {
   getPasskeyPolicyErrorCode,
   getRecoveryErrorCode,
   getWebAuthnErrorDetail,
+  hasAllPermissions,
   hasNonPasskeyLoginMethod,
+  hasOrganizationRole,
+  hasPermission,
+  hasRole,
   hasScopedRole,
   isEnrollmentRequired,
   isPasskeyPrfSupported,
@@ -146,6 +159,7 @@ export {
   useAuthorizedFetch,
   useLoginMethods,
   usePasskeySupport,
+  usePermissions,
   useRecoveryOptions,
 };
 export type {
@@ -190,6 +204,7 @@ export type {
   PasskeyPrfInput,
   PasskeyPrfResult,
   PasskeyRegistrationData,
+  PermissionCheckOptions,
   PublicSystemConfigResult,
   QrCode,
   RecoveryCodesResult,
@@ -214,5 +229,7 @@ export type {
   TransportOptions,
   UpdateOrganizationInput,
   User,
+  UserAuthorization,
+  UsePermissionsResult,
   WebAuthnErrorDetail,
 };

@@ -11,6 +11,7 @@ export * from './client/webauthnPrf';
 export * from './client/webauthnSupport';
 export * from './fetchWithAuth';
 export * from './flows';
+export * from './permissions';
 export * from './ports/browserPasskeys';
 export * from './ports/oauthRedirect';
 export * from './ports/passkeys';

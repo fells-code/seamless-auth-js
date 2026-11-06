@@ -35,6 +35,9 @@ npm install @seamless-auth/client
 - PRF helpers for passkey-derived secrets.
 - `hasScopedRole` / `roleGrantsAccess`, the same role matching the auth API and
   server adapters apply.
+- `hasPermission`, `hasAllPermissions`, `hasRole` and `hasOrganizationRole`, which
+  read the `/users/me` user for showing and hiding UI. See
+  [Permissions and roles](#permissions-and-roles).
 - Flows: the step logic behind the bundled sign-in screens, so every binding
   behaves the same and none reimplements it. See below.
 
@@ -105,6 +108,25 @@ URL, a relative URL) throws `UnsafeAuthorizationUrlError` without navigating,
 and `startOAuthSignIn` reports it as a provider that would not start. A custom
 `OAuthRedirectPort` can apply the same check with
 `assertNavigableAuthorizationUrl(url)`.
+
+## Permissions and roles
+
+**For UI only. The server must still enforce.** These read the last `/users/me`
+response, so a change reaches the client when the user is next refreshed. The
+client never decodes a token.
+
+```ts
+hasPermission(user, 'reports:read'); // instance or active organization grant
+hasPermission(user, 'projects:write', { organization: true }); // active organization only
+hasAllPermissions(user, ['reports:read', 'projects:write']);
+hasRole(user, 'admin:read'); // instance roles, scoped like hasScopedRole
+hasOrganizationRole(user, ['owner', 'admin']); // active organization roles, exact
+```
+
+Permission and organization role matching is exact, with no wildcards or implied
+grants. An organization `admin` never satisfies `hasRole('admin')`. A field an older
+API leaves out means unknown, and every check against it, or against a missing
+user, answers `false`.
 
 ## Transport
 

@@ -45,6 +45,25 @@ describe('wire types match what the API sends', () => {
     expect([phone, roles, wrong]).toHaveLength(3);
   });
 
+  it('keeps the permission fields optional, since an older API leaves them out', () => {
+    const fromOlderApi: User = {
+      id: 'user-1',
+      email: 'user@example.com',
+      phone: null,
+      roles: [],
+    };
+    const permissions: string[] | undefined = fromOlderApi.permissions;
+    const organizationRoles: string[] | undefined = fromOlderApi.organizationRoles;
+    const organizationPermissions: string[] | undefined =
+      fromOlderApi.organizationPermissions;
+
+    expect([permissions, organizationRoles, organizationPermissions]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
   it('types organization timestamps as strings', () => {
     const createdAt: string = '' as Organization['createdAt'];
 

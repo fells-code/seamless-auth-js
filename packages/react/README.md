@@ -20,6 +20,8 @@ New to Seamless Auth? The [self-hosted quickstart](https://docs.seamlessauth.com
 - `createSeamlessAuthClient()`
 - `useAuthClient()`
 - `usePasskeySupport()`
+- `usePermissions()`, `hasPermission()`, `hasAllPermissions()`, `hasRole()` and `hasOrganizationRole()`
+  for showing and hiding UI (see [Permissions and organization roles](#permissions-and-organization-roles))
 - `hasScopedRole()` and `roleGrantsAccess()`
 - `SeamlessAuthError`, the error type carried on a failed result
 - `getOAuthErrorCode()`, which reads the known OAuth callback failure codes off that error
@@ -389,6 +391,56 @@ hasScopedRole('admin:write'); // true for admin or admin:write
 
 The package also exports standalone `hasScopedRole(roles, required)` and `roleGrantsAccess(...)`
 helpers for code that is not inside `AuthProvider`.
+
+### Permissions and organization roles
+
+`usePermissions()` gates UI on the permissions and roles the signed-in user carries.
+
+> **For UI only. The server must still enforce.** Hiding a button does not protect what it calls.
+> Guard the route on your server as well. These checks reflect the last `/users/me` read, so a
+> change reaches the client when the user is next refreshed: on `refreshSession()`, after a
+> sign-in or organization switch, or on the next page load. The client never decodes a token.
+
+```tsx
+import { usePermissions } from '@seamless-auth/react';
+
+function ReportsLink() {
+  const { hasPermission, loading } = usePermissions();
+
+  if (loading || !hasPermission('reports:read')) return null;
+
+  return <a href="/reports">Reports</a>;
+}
+```
+
+| Check                                             | Reads                                                 | Matching                 |
+| ------------------------------------------------- | ----------------------------------------------------- | ------------------------ |
+| `hasPermission(required)`                         | `permissions` and `organizationPermissions`           | exact, any of `required` |
+| `hasPermission(required, { organization: true })` | `organizationPermissions` only                        | exact, any of `required` |
+| `hasAllPermissions(required, options?)`           | the same, with the same `organization` option         | exact, all of `required` |
+| `hasRole(required)`                               | `roles`, the instance roles                           | scoped (`hasScopedRole`) |
+| `hasOrganizationRole(required)`                   | `organizationRoles`, roles in the active organization | exact, any of `required` |
+
+- Permission matching is exact, with no wildcards or implied grants: `invoices:write` does not
+  satisfy `invoices:read`. A permission is held if either the instance or the active organization
+  grants it, the same union the server guard uses by default. The `organization` option leaves out
+  instance-wide grants.
+- Instance and organization roles stay apart. An organization `admin` does not satisfy
+  `hasRole('admin')`, and an instance `admin` does not satisfy `hasOrganizationRole('admin')`.
+- An API older than these fields leaves them out, which means unknown rather than none. Every check
+  then answers `false`, as it does while signed out or loading. The hook's `permissions`,
+  `organizationRoles` and `organizationPermissions` stay `undefined` in that case, so you can tell
+  unknown from an empty list.
+- The organization fields describe the active organization only. If a page is about a specific
+  organization, compare its id with `activeOrganizationId` as well.
+
+The hook also returns `roles`, `permissions`, `organizationRoles`, `organizationPermissions`,
+`activeOrganizationId` and `loading`. The same four checks are exported as standalone functions that
+take the user first, such as `hasPermission(user, 'reports:read')`. Server code imports those from
+`@seamless-auth/client`.
+
+`hasRole` from this hook uses scoped matching, like `hasScopedRole`. `useAuth().hasRole` remains the
+exact check described in [Scoped roles](#scoped-roles), and answers `undefined` while signed out.
 
 ### Step-up authentication
 
