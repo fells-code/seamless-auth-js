@@ -1,5 +1,21 @@
 # @seamless-auth/react
 
+## 0.20.0
+
+### Minor Changes
+
+- de0a386: Add `hasPermission`, `hasAllPermissions`, `hasRole` and `hasOrganizationRole`, which read the permissions and roles the `/users/me` user carries, and a `usePermissions` hook in `@seamless-auth/react`. A permission is held if the instance or the active organization grants it, and `{ organization: true }` counts only the active organization, matching the server's `requirePermission`. Permission and organization role matching is exact, instance roles keep their scoped matching, and an organization role never satisfies an instance role check. Fields an older API leaves out answer false. These are for showing and hiding UI only: the server must still enforce. They reflect the last `/users/me` read, so a change reaches the client when the user is next refreshed.
+
+### Patch Changes
+
+- 8062f12: The built-in screens' default colours now meet WCAG 2.2 AA contrast. On the passkey enrollment screen the primary button is `#047857` (hover `#065f46`), the outlined button `#047857`, the skip link `#1d4ed8`, and the success and error messages `#047857` and `#b91c1c` against the light panel. On the recovery code, authenticator app, and account security screens the primary button is `#2563eb` (hover `#1d4ed8`) and outlined buttons such as Copy and Download are `#60a5fa`. The resend link's hover colour on the email and phone code screens is `#93c5fd`, and the code entry boxes have a `#9ca3af` border so they stand out from the card. These are fallbacks of the existing `--seamless-*` custom properties, so an app that sets those tokens sees no change. The theming section of the README now lists `--seamless-accent-muted` and the new defaults.
+- 1a9270e: Depend on `@seamless-auth/types` `^0.36.0`, which adds the session exchange contract.
+- de0a386: Depend on `@seamless-auth/types` `^0.38.0`, which adds permissions and organization roles to the `/users/me` user.
+- Updated dependencies [de0a386]
+- Updated dependencies [1a9270e]
+- Updated dependencies [de0a386]
+  - @seamless-auth/client@0.9.0
+
 ## 0.19.3
 
 ### Patch Changes
