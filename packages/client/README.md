@@ -31,7 +31,7 @@ npm install @seamless-auth/client
   bound with `useSyncExternalStore` or an equivalent.
 - `SessionStoragePort` with browser and memory implementations.
 - `SeamlessAuthError`, `getWebAuthnErrorDetail`, `getOAuthErrorCode`,
-  `isUnauthenticated`, and the other error readers.
+  `isUnauthenticated`, `isNetworkError`, and the other error readers.
 - PRF helpers for passkey-derived secrets.
 - `hasScopedRole` / `roleGrantsAccess`, the same role matching the auth API and
   server adapters apply.
@@ -43,6 +43,19 @@ npm install @seamless-auth/client
 
 The wire types come from `@seamless-auth/types`; this package aliases them rather
 than redeclaring shapes.
+
+### Refreshing the session
+
+`actions.refreshSession()` reads `/users/me` and signs the user out only when the
+server refuses the session (a `401`, for example). When the server cannot be
+reached (offline, DNS, timeout, an aborted request) or answers with a `5xx`, `408`
+or `429`, the user and session stay as they were, and the state's `networkError`
+holds the `SeamlessAuthError` instead, so an app opened with no signal keeps its
+signed-in user. The next successful refresh, or a sign-out, sets `networkError`
+back to `null`. On a cold start that cannot reach the server there is no user to
+keep, so the state settles signed out with `networkError` set, which a UI can show
+as "offline" rather than as a sign-in screen. `isNetworkError(error)` reads the
+same distinction off any result error.
 
 ## Flows
 
@@ -144,7 +157,9 @@ user, answers `false`.
   returned (kept in memory only), signed-in routes carry the access token; the
   pair a sign-in returns is written through the `TokenStoragePort`; a 401 on a
   signed-in route triggers one `POST /refresh` and one retry, with at most one
-  refresh in flight. The native contract.
+  refresh in flight. A refused refresh clears the stored tokens; one that cannot
+  reach the server, or that answers `5xx`, `408` or `429`, keeps them and the
+  request rejects as an unreachable server would. The native contract.
 
 Which routes take which token is one table, `ROUTE_RULES` in `src/transport.ts`,
 mirroring the server adapter's own map.

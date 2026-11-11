@@ -117,6 +117,10 @@ client for the multi-step flows. The client is the same instance the session
 drives, which is what carries a sign-in from `/login` through its OTP or
 passkey step.
 
+`refreshSession` signs the user out only when the server refuses the session.
+Opened offline, or against a server answering `5xx`, the user stays signed in and
+`useAuth().networkError` holds the failure until the next successful refresh.
+
 Every method returns a `SeamlessAuthResult`: `{ data, error: null }` or
 `{ data: null, error }`. Nothing throws for a failed request.
 

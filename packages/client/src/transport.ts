@@ -9,6 +9,7 @@ import {
   type StoredTokens,
   type TokenStoragePort,
 } from './ports/tokenStorage';
+import { toSeamlessAuthError } from './client/errors';
 
 /**
  * How the client carries its session to the server adapter.
@@ -544,6 +545,17 @@ export function createTransport(options: TransportOptions): Transport {
           // be renewed with, and on React Native the token may have gone.
           await clearTokens();
           throw error;
+        }
+
+        if (
+          response.status === 408 ||
+          response.status === 429 ||
+          response.status >= 500
+        ) {
+          // The server did not judge the token, so it is kept for the next
+          // attempt. Rejecting, as an unreachable server would, keeps the
+          // caller from reading the original 401 as a refused session.
+          throw await toSeamlessAuthError(response, 'Failed to refresh the session.');
         }
 
         if (!response.ok) {

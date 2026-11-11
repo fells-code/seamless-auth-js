@@ -8,6 +8,7 @@ import {
   getOAuthErrorCode,
   getPasskeyPolicyErrorCode,
   getWebAuthnErrorDetail,
+  isNetworkError,
   type PasskeyPolicyErrorCode,
   SeamlessAuthError,
   toSeamlessAuthError,
@@ -341,5 +342,30 @@ describe('getWebAuthnErrorDetail', () => {
   it('returns undefined for anything that is not a SeamlessAuthError', () => {
     expect(getWebAuthnErrorDetail(ceremonyError())).toBeUndefined();
     expect(getWebAuthnErrorDetail(null)).toBeUndefined();
+  });
+});
+
+describe('isNetworkError', () => {
+  it.each([0, 408, 429, 500, 503])('counts status %i as a failure in transit', status => {
+    expect(isNetworkError(new SeamlessAuthError('Failed', status))).toBe(true);
+  });
+
+  it.each([400, 401, 403, 404])('does not count status %i', status => {
+    expect(isNetworkError(new SeamlessAuthError('Failed', status))).toBe(false);
+  });
+
+  it('does not count a refused redirect', () => {
+    const cause = Object.assign(new Error('redirected'), {
+      name: 'UntrustedRedirectError',
+    });
+
+    expect(isNetworkError(new SeamlessAuthError('Failed', 0, undefined, cause))).toBe(
+      false
+    );
+  });
+
+  it('does not count anything that is not a SeamlessAuthError', () => {
+    expect(isNetworkError(new TypeError('Network request failed'))).toBe(false);
+    expect(isNetworkError(null)).toBe(false);
   });
 });

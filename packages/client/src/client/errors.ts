@@ -178,6 +178,27 @@ export function isUnauthenticated(error: unknown): boolean {
   return error instanceof SeamlessAuthError && error.status === 401;
 }
 
+/**
+ * Whether a request failed in transit rather than being answered: the server
+ * could not be reached (offline, DNS, timeout, aborted), or it answered with a
+ * `5xx`, `408` or `429`. The session behind such a request may still be good, so
+ * this is a reason to retry later, not to sign the user out.
+ *
+ * A refused redirect also fails without a response, but it is a refusal, so it
+ * is not counted.
+ */
+export function isNetworkError(error: unknown): boolean {
+  if (!(error instanceof SeamlessAuthError)) {
+    return false;
+  }
+
+  if (error.status === 0) {
+    return !(isErrorLike(error.cause) && error.cause.name === 'UntrustedRedirectError');
+  }
+
+  return error.status === 408 || error.status === 429 || error.status >= 500;
+}
+
 function topLevelError(body: unknown): string | undefined {
   if (typeof body !== 'object' || body === null) {
     return undefined;
