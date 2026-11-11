@@ -8,6 +8,8 @@ import { createAuthSession } from '../src/session/createAuthSession';
 import { createMemoryStorage, SessionStoragePort } from '../src/session/storage';
 import { createFetchTransport, createFetchWithAuth } from '../src/fetchWithAuth';
 import { startRegistration } from '@simplewebauthn/browser';
+import { isNetworkError } from '../src/client/errors';
+import { UntrustedRedirectError } from '../src/transport';
 
 jest.mock('../src/fetchWithAuth');
 
@@ -69,6 +71,7 @@ describe('createAuthSession', () => {
       stepUpStatus: null,
       isAuthenticated: false,
       recoverySession: false,
+      networkError: null,
       loading: true,
       hasSignedInBefore: false,
     });
@@ -142,6 +145,104 @@ describe('createAuthSession', () => {
         user: null,
         isAuthenticated: false,
         loading: false,
+      });
+    });
+  });
+
+  describe('refreshSession when the server cannot be reached', () => {
+    const signedInSession = () =>
+      createAuthSession({
+        apiHost,
+        storage: createMemoryStorage(),
+        initialSession: { user },
+      });
+
+    it('signs out on a 401 and reports no network error', async () => {
+      const session = signedInSession();
+      mockFetchWithAuth.mockResolvedValueOnce(failedResponse(401));
+
+      await session.actions.refreshSession();
+
+      expect(session.getState()).toMatchObject({
+        user: null,
+        isAuthenticated: false,
+        networkError: null,
+        loading: false,
+      });
+    });
+
+    it('keeps the user and reports the failure when the request is rejected', async () => {
+      const session = signedInSession();
+      const offline = new TypeError('Network request failed');
+      mockFetchWithAuth.mockRejectedValueOnce(offline);
+
+      const { error } = await session.actions.refreshSession();
+
+      expect(isNetworkError(error)).toBe(true);
+      expect(session.getState()).toMatchObject({
+        user,
+        isAuthenticated: true,
+        loading: false,
+      });
+      expect(session.getState().networkError).toBe(error);
+      expect(session.getState().networkError?.cause).toBe(offline);
+    });
+
+    it('keeps the user on a 5xx', async () => {
+      const session = signedInSession();
+      mockFetchWithAuth.mockResolvedValueOnce(failedResponse(503));
+
+      await session.actions.refreshSession({ background: true });
+
+      expect(session.getState()).toMatchObject({
+        user,
+        isAuthenticated: true,
+        networkError: { status: 503 },
+      });
+    });
+
+    it('clears the network error on the next successful refresh', async () => {
+      const session = signedInSession();
+      mockFetchWithAuth.mockRejectedValueOnce(new TypeError('Network request failed'));
+      await session.actions.refreshSession();
+      expect(session.getState().networkError).not.toBeNull();
+
+      mockFetchWithAuth.mockResolvedValueOnce(okResponse({ user, credentials: [] }));
+      await session.actions.refreshSession();
+
+      expect(session.getState()).toMatchObject({
+        user,
+        isAuthenticated: true,
+        networkError: null,
+      });
+    });
+
+    it('settles a cold start that could not reach the server', async () => {
+      const session = buildSession();
+      mockFetchWithAuth.mockRejectedValueOnce(new TypeError('Network request failed'));
+
+      await session.actions.refreshSession();
+
+      expect(session.getState()).toMatchObject({
+        user: null,
+        isAuthenticated: false,
+        loading: false,
+      });
+      expect(session.getState().networkError).not.toBeNull();
+    });
+
+    it('signs out when a redirect is refused rather than followed', async () => {
+      const session = signedInSession();
+      mockFetchWithAuth.mockRejectedValueOnce(
+        new UntrustedRedirectError('https://elsewhere.example.com/')
+      );
+
+      await session.actions.refreshSession();
+
+      expect(session.getState()).toMatchObject({
+        user: null,
+        isAuthenticated: false,
+        networkError: null,
       });
     });
   });

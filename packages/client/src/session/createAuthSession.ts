@@ -25,6 +25,7 @@ import {
   StepUpPrfData,
   StepUpStatus,
 } from '../client/createSeamlessAuthClient';
+import { isNetworkError, SeamlessAuthError } from '../client/errors';
 import type { SeamlessAuthResult } from '../client/result';
 import { PasskeyPrfInput } from '../client/webauthnPrf';
 import { hasScopedRole as rolesGrantScopedAccess } from '../scopedRoles';
@@ -64,6 +65,13 @@ export interface AuthSessionState {
    * Read from `/users/me`, so it survives a reload.
    */
   recoverySession: boolean;
+  /**
+   * Why the last `refreshSession` could not read the session, when the server
+   * could not be reached or failed (see `isNetworkError`). The user and session
+   * are left as they were, so an app opened offline stays signed in. Cleared by
+   * the next successful refresh and on sign-out.
+   */
+  networkError: SeamlessAuthError | null;
   loading: boolean;
   hasSignedInBefore: boolean;
 }
@@ -166,6 +174,7 @@ const SIGNED_OUT = {
   stepUpStatus: null,
   isAuthenticated: false,
   recoverySession: false,
+  networkError: null,
 } satisfies Partial<AuthSessionState>;
 
 function signedIn(session: InitialSession) {
@@ -276,6 +285,12 @@ export function createAuthSession(options: AuthSessionOptions): AuthSession {
       return result;
     }
 
+    if (isNetworkError(result.error)) {
+      setState({ networkError: result.error, loading: false });
+
+      return result;
+    }
+
     if (result.error) {
       // The session is unusable, so it is dropped locally. Calling the logout
       // endpoint here would fire a request for a session the server has already
@@ -289,6 +304,7 @@ export function createAuthSession(options: AuthSessionOptions): AuthSession {
     setState({
       ...signedIn(result.data),
       recoverySession: client.isRecoverySession(),
+      networkError: null,
       loading: false,
     });
 

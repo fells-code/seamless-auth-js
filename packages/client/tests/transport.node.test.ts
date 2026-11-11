@@ -642,6 +642,43 @@ describe('bearer transport', () => {
     expect(calls).toHaveLength(2);
   });
 
+  it.each([503, 429])(
+    'keeps the session and rejects when the refresh answers %i',
+    async status => {
+      const storage = createMemoryTokenStorage();
+      await storage.set({ accessToken: 'access-old', refreshToken: 'refresh-old' });
+      const { calls, fetchImpl } = scriptedFetch(call =>
+        call.url.endsWith('/refresh')
+          ? jsonResponse(status, { error: 'unavailable' })
+          : jsonResponse(401, { error: 'unauthenticated' })
+      );
+
+      await expect(
+        bearer(fetchImpl, storage).fetch('/users/me', { method: 'GET' })
+      ).rejects.toMatchObject({ name: 'SeamlessAuthError', status });
+      expect(await storage.get()).toEqual({
+        accessToken: 'access-old',
+        refreshToken: 'refresh-old',
+      });
+      expect(calls).toHaveLength(2);
+    }
+  );
+
+  it('keeps the session when the refresh never reaches the server', async () => {
+    const storage = createMemoryTokenStorage();
+    await storage.set({ accessToken: 'access-old', refreshToken: 'refresh-old' });
+    const offline = new TypeError('Network request failed');
+    const { fetchImpl } = scriptedFetch(call => {
+      if (call.url.endsWith('/refresh')) throw offline;
+      return jsonResponse(401, { error: 'unauthenticated' });
+    });
+
+    await expect(
+      bearer(fetchImpl, storage).fetch('/users/me', { method: 'GET' })
+    ).rejects.toBe(offline);
+    expect(await storage.get()).not.toBeNull();
+  });
+
   it('does not refresh a 401 on a pre-auth or public route', async () => {
     const storage = createMemoryTokenStorage();
     await storage.set({ accessToken: 'access', refreshToken: 'refresh' });
