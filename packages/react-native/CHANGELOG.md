@@ -1,5 +1,14 @@
 # @seamless-auth/react-native
 
+## 0.5.1
+
+### Patch Changes
+
+- c82ec0b: Depend on `@seamless-auth/types` `^0.40.0`, which adds the webhook, login hook, custom claim and audit sink schemas and the login hook denial errors.
+- Updated dependencies [67bba9c]
+- Updated dependencies [c82ec0b]
+  - @seamless-auth/client@0.10.0
+
 ## 0.5.0
 
 ### Minor Changes
