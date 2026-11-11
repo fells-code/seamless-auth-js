@@ -1,5 +1,13 @@
 # @seamless-auth/angular
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [67bba9c]
+- Updated dependencies [c82ec0b]
+  - @seamless-auth/client@0.10.0
+
 ## 0.5.0
 
 ### Minor Changes
