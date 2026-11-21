@@ -113,6 +113,11 @@ export interface RequireAuthOptions {
   roles?: string | string[];
   /** Where to send a signed-in user without the role. Defaults to `signedInPath`. */
   forbiddenRedirectTo?: string;
+  /**
+   * Where to send a recovery session, which can do nothing but enroll a new
+   * factor. Defaults to the configured `enrollmentPath`.
+   */
+  enrollmentRedirectTo?: string;
 }
 
 /**
@@ -125,6 +130,7 @@ export interface RequireAuthOptions {
  *
  * It waits for the session to be read, so reloading a protected page does not
  * bounce a signed-in user, and runs again whenever the session changes. A
+ * recovery session is sent to `enrollmentPath`, since it can do nothing else. A
  * server render that was not handed an `initialSession` cannot see the session
  * and treats the visitor as signed out, so set `export const ssr = false` on
  * protected routes, which suits a backend-for-frontend application anyway.
@@ -136,6 +142,17 @@ export function requireAuth(auth: SeamlessAuth, options: RequireAuthOptions = {}
 
     if (state.loading || !state.isAuthenticated) {
       redirect(307, resolve(options.redirectTo ?? auth.loginPath));
+    }
+
+    if (state.recoverySession) {
+      const enrollment = resolve(options.enrollmentRedirectTo ?? auth.enrollmentPath);
+
+      // Guarding the enrollment route itself must not loop.
+      if (event.url.pathname !== enrollment) {
+        redirect(307, enrollment);
+      }
+
+      return;
     }
 
     if (options.roles !== undefined && !auth.hasScopedRole(options.roles)) {

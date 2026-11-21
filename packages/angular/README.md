@@ -63,18 +63,19 @@ configuration at runtime:
 provideSeamlessAuth(() => ({ apiHost: inject(RUNTIME_CONFIG).apiUrl }));
 ```
 
-| Option                     | Default          | Purpose                                                     |
-| -------------------------- | ---------------- | ----------------------------------------------------------- |
-| `apiHost`                  | required         | Origin of the server adapter                                |
-| `basePath`                 | `/auth`          | Where the adapter is mounted                                |
-| `magicLinkRedirectUri`     | the deployment's | Where an emailed magic link lands                           |
-| `autoDetectPreviousSignIn` | `true`           | Open the login screen on Sign In for a returning browser    |
-| `initialSession`           | none             | A session the server already resolved, for server rendering |
-| `ports`                    | browser          | `passkeys` and `oauthRedirect` ports                        |
-| `fetch`                    | global `fetch`   | The fetch auth requests go through                          |
-| `trustedOrigins`           | none             | Other origins of yours that may receive the session cookies |
-| `signedInPath`             | `/`              | Where the bundled screens go after sign-in                  |
-| `loginPath`                | `/login`         | Where `requireAuth` sends someone signed out                |
+| Option                     | Default             | Purpose                                                     |
+| -------------------------- | ------------------- | ----------------------------------------------------------- |
+| `apiHost`                  | required            | Origin of the server adapter                                |
+| `basePath`                 | `/auth`             | Where the adapter is mounted                                |
+| `magicLinkRedirectUri`     | the deployment's    | Where an emailed magic link lands                           |
+| `autoDetectPreviousSignIn` | `true`              | Open the login screen on Sign In for a returning browser    |
+| `initialSession`           | none                | A session the server already resolved, for server rendering |
+| `ports`                    | browser             | `passkeys` and `oauthRedirect` ports                        |
+| `fetch`                    | global `fetch`      | The fetch auth requests go through                          |
+| `trustedOrigins`           | none                | Other origins of yours that may receive the session cookies |
+| `signedInPath`             | `/`                 | Where the bundled screens go after sign-in                  |
+| `loginPath`                | `/login`            | Where `requireAuth` sends someone signed out                |
+| `enrollmentPath`           | `/register-passkey` | Where `requireAuth` sends a recovery session                |
 
 The session is read as soon as the application starts in the browser.
 
@@ -104,10 +105,10 @@ The guards work as `canActivate`, `canActivateChild` and `canMatch`. They wait f
 read before deciding, so reloading a protected page does not bounce a signed-in user to the login
 screen.
 
-| Guard                                   | Admits                                    | Otherwise                                                                                   |
-| --------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `authGuard` / `requireAuth(options?)`   | A signed-in user, with `roles` when given | `redirectTo` (default `loginPath`); `forbiddenRedirectTo` or refusal when a role is missing |
-| `guestGuard` / `requireGuest(options?)` | Someone signed out                        | `redirectTo` (default `signedInPath`)                                                       |
+| Guard                                   | Admits                                    | Otherwise                                                                                                                                                             |
+| --------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authGuard` / `requireAuth(options?)`   | A signed-in user, with `roles` when given | `redirectTo` (default `loginPath`); `enrollmentRedirectTo` (default `enrollmentPath`) for a recovery session; `forbiddenRedirectTo` or refusal when a role is missing |
+| `guestGuard` / `requireGuest(options?)` | Someone signed out                        | `redirectTo` (default `signedInPath`)                                                                                                                                 |
 
 `roles` uses the same matching as the auth API, scoped roles such as `org:admin` included. A guard is
 a convenience for navigation, not access control: your server still checks every request.
@@ -148,7 +149,8 @@ Signals: `state`, `user`, `isAuthenticated`, `loading`, `credentials`, `organiza
 Observables: `state$`, `user$`, `isAuthenticated$`. Each emits the current value on subscribe.
 
 Actions, each resolving to a `SeamlessAuthResult<T>` (`{ data, error }`) that never throws for an HTTP
-failure: `login`, `handlePasskeyLogin`, `registerPasskey`, `refreshSession`, `logout`,
+failure: `login`, `handlePasskeyLogin`, `redeemRecoveryCode`, `completeAccountRecovery`,
+`registerPasskey`, `refreshSession`, `logout`,
 `logoutAllSessions`, `deleteUser`, `updateCredential`, `deleteCredential`, `switchOrganization`,
 `listOAuthProviders`, `startOAuthLogin`, `finishOAuthLogin`, `refreshStepUpStatus`,
 `verifyStepUpWithPasskey`, `verifyStepUpWithPasskeyPrf`, `verifyStepUpWithTotp`.

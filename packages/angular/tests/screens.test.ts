@@ -1039,3 +1039,25 @@ describe('passkey enrollment offers an authenticator app', () => {
     expect(text()).not.toContain('Use an authenticator app');
   });
 });
+
+describe('recovery session on the login screen', () => {
+  const recovering = { body: { ...(signedIn.body as object), recovery: true } };
+
+  it('goes straight to passkey enrollment', async () => {
+    await open('/login', { 'GET /users/me': recovering });
+
+    expect(url()).toBe('/register-passkey');
+  });
+
+  it('goes there once a session turns into a recovery session', async () => {
+    let session: AdapterReply = signedOut;
+    await open('/login', { 'GET /users/me': () => session });
+    expect(url()).toBe('/login');
+
+    session = recovering;
+    await TestBed.inject(SeamlessAuth).refreshSession();
+    await settle();
+
+    expect(url()).toBe('/register-passkey');
+  });
+});

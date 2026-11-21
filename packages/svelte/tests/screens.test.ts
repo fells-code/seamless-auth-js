@@ -975,3 +975,27 @@ describe('stylesheet', () => {
     expect(document.getElementById('seamless-auth-styles')).toBeNull();
   });
 });
+
+describe('recovery session on the login screen', () => {
+  const recovering = { body: { ...(signedIn.body as object), recovery: true } };
+
+  it('goes straight to passkey enrollment', async () => {
+    await open('login', { 'GET /users/me': recovering });
+    await waitSettled();
+
+    expect(nav.current).toBe('registerPasskey');
+  });
+
+  it('goes there once a session turns into a recovery session', async () => {
+    let session: AdapterReply = signedOut;
+    const { auth } = await open('login', { 'GET /users/me': () => session });
+    await waitSettled();
+    expect(nav.current).toBe('login');
+
+    session = recovering;
+    await auth.refreshSession();
+    await waitSettled();
+
+    expect(nav.current).toBe('registerPasskey');
+  });
+});

@@ -9,6 +9,8 @@ import {
   Router,
   type CanActivateFn,
   type CanMatchFn,
+  type RouterStateSnapshot,
+  type UrlSegment,
   type UrlTree,
 } from '@angular/router';
 
@@ -24,18 +26,38 @@ export interface RequireAuthOptions {
   roles?: string | string[];
   /** Where to send a signed-in user without the role. Left out, navigation is refused. */
   forbiddenRedirectTo?: string;
+  /**
+   * Where to send a recovery session, which can do nothing but enroll a new
+   * factor. Defaults to the configured `enrollmentPath`.
+   */
+  enrollmentRedirectTo?: string;
 }
 
 /** A guard usable as `canActivate`, `canActivateChild` or `canMatch`. */
 export type SeamlessAuthGuard = CanActivateFn & CanMatchFn;
 
 /**
+ * The path a guard is deciding on: the whole URL for `canActivate`, and the
+ * segments being matched for `canMatch`.
+ */
+function targetPath(target: RouterStateSnapshot | UrlSegment[] | undefined): string {
+  if (Array.isArray(target)) {
+    return `/${target.map(segment => segment.path).join('/')}`;
+  }
+
+  return (target?.url ?? '').split(/[?#]/)[0];
+}
+
+/**
  * Admits a signed-in user. Waits for the session to be read first, so a page
  * load on a protected route is not bounced to the login screen while the
- * session is still loading.
+ * session is still loading. A recovery session is sent to factor enrollment.
  */
 export function requireAuth(options: RequireAuthOptions = {}): SeamlessAuthGuard {
-  return async (): Promise<boolean | UrlTree> => {
+  return async (
+    _route: unknown,
+    target?: RouterStateSnapshot | UrlSegment[]
+  ): Promise<boolean | UrlTree> => {
     const auth = inject(SeamlessAuth);
     const router = inject(Router);
     const state = await auth.whenSettled();
@@ -45,6 +67,16 @@ export function requireAuth(options: RequireAuthOptions = {}): SeamlessAuthGuard
     // response. The browser decides again once the application boots there.
     if (state.loading || !state.isAuthenticated) {
       return router.parseUrl(options.redirectTo ?? auth.loginPath);
+    }
+
+    if (state.recoverySession) {
+      const enrollment = router.parseUrl(
+        options.enrollmentRedirectTo ?? auth.enrollmentPath
+      );
+      const enrollmentPath = router.serializeUrl(enrollment).split(/[?#]/)[0];
+
+      // Guarding the enrollment route itself must not loop.
+      return targetPath(target) === enrollmentPath ? true : enrollment;
     }
 
     if (options.roles !== undefined && !auth.hasScopedRole(options.roles)) {

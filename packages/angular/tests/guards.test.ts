@@ -15,7 +15,9 @@ import { createAdapter, signedIn, signedOut } from '../../../test-support/fakeAd
 @Component({ template: 'page' })
 class Page {}
 
-function setup(session: typeof signedIn, platform = 'browser') {
+const recovering = { body: { ...(signedIn.body as object), recovery: true } };
+
+function setup(session: typeof signedIn | typeof recovering, platform = 'browser') {
   const adapter = createAdapter({ 'GET /users/me': session });
   TestBed.configureTestingModule({
     providers: [
@@ -46,6 +48,18 @@ function setup(session: typeof signedIn, platform = 'browser') {
           path: 'custom',
           component: Page,
           canActivate: [requireAuth({ redirectTo: '/denied' })],
+        },
+        { path: 'register-passkey', component: Page, canActivate: [authGuard] },
+        { path: 'enroll', component: Page },
+        {
+          path: 'setup',
+          component: Page,
+          canMatch: [requireAuth({ enrollmentRedirectTo: '/setup' })],
+        },
+        {
+          path: 'settings',
+          component: Page,
+          canActivate: [requireAuth({ enrollmentRedirectTo: '/enroll' })],
         },
       ]),
     ],
@@ -95,5 +109,24 @@ describe('guards', () => {
     expect(await visit('/billing')).toBe('/denied');
     // A refused canMatch leaves the URL unmatched, which is the point of it.
     await expect(visit('/admin')).rejects.toThrow(/NG04002/);
+  });
+
+  it('sends a recovery session to factor enrollment, roles or not', async () => {
+    setup(recovering);
+    expect(await visit('/')).toBe('/register-passkey');
+    expect(await visit('/org')).toBe('/register-passkey');
+    expect(await visit('/admin')).toBe('/register-passkey');
+  });
+
+  it('admits a recovery session to a guarded enrollment route without looping', async () => {
+    setup(recovering);
+    expect(await visit('/register-passkey')).toBe('/register-passkey');
+  });
+
+  it('takes the enrollment route from the guard options', async () => {
+    setup(recovering);
+    expect(await visit('/settings')).toBe('/enroll');
+    // canMatch sees the URL segments rather than the router state.
+    expect(await visit('/setup')).toBe('/setup');
   });
 });

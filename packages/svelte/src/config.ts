@@ -53,6 +53,11 @@ export interface SeamlessAuthConfig {
   signedInPath?: string;
   /** Where `requireAuth` sends someone who is signed out. Defaults to `/login`. */
   loginPath?: string;
+  /**
+   * Where `requireAuth` sends a recovery session, which
+   * can do nothing but enroll a new factor. Defaults to `/register-passkey`.
+   */
+  enrollmentPath?: string;
 }
 
 export interface SeamlessAuthPorts {

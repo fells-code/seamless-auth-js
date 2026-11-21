@@ -94,6 +94,8 @@ export interface SeamlessAuth extends AuthSessionActions {
   signedInPath: string;
   /** Where `requireAuth` sends someone who is signed out. */
   loginPath: string;
+  /** Where `requireAuth` sends a recovery session. */
+  enrollmentPath: string;
 }
 
 export const SEAMLESS_AUTH_KEY: InjectionKey<SeamlessAuth> = Symbol('seamless-auth');
@@ -212,6 +214,7 @@ function createSeamlessAuthInstance(config: SeamlessAuthConfig): SeamlessAuth & 
     styles: { inject: config.injectStyles ?? true, nonce: config.cspNonce },
     signedInPath: config.signedInPath ?? '/',
     loginPath: config.loginPath ?? '/login',
+    enrollmentPath: config.enrollmentPath ?? '/register-passkey',
 
     destroy() {
       [...pendingSettles].forEach(abandon => abandon());

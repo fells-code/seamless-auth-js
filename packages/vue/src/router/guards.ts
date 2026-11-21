@@ -4,7 +4,11 @@
  * See LICENSE file in the project root for full license information
  */
 
-import type { NavigationGuardWithThis, RouteLocationRaw } from 'vue-router';
+import {
+  useRouter,
+  type NavigationGuardWithThis,
+  type RouteLocationRaw,
+} from 'vue-router';
 
 import { useSeamlessAuth } from '../plugin';
 
@@ -18,6 +22,11 @@ export interface RequireAuthOptions {
   roles?: string | string[];
   /** Where to send a signed-in user without the role. Left out, navigation is refused. */
   forbiddenRedirectTo?: RouteLocationRaw;
+  /**
+   * Where to send a recovery session, which can do nothing but enroll a new
+   * factor. Defaults to the configured `enrollmentPath`.
+   */
+  enrollmentRedirectTo?: RouteLocationRaw;
 }
 
 /** A guard for `beforeEnter`, or to call from `router.beforeEach`. */
@@ -26,12 +35,13 @@ export type SeamlessAuthGuard = NavigationGuardWithThis<undefined>;
 /**
  * Admits a signed-in user. Waits for the session to be read first, so a page
  * load on a protected route is not bounced to the login screen while the
- * session is still loading.
+ * session is still loading. A recovery session is sent to factor enrollment.
  */
 export function requireAuth(options: RequireAuthOptions = {}): SeamlessAuthGuard {
-  return async () => {
+  return async to => {
     // vue-router runs guards inside the application's context, so inject works.
     const auth = useSeamlessAuth();
+    const router = useRouter();
     const state = await auth.whenSettled();
 
     // A server render that was not handed the session cannot tell, and treats
@@ -39,6 +49,15 @@ export function requireAuth(options: RequireAuthOptions = {}): SeamlessAuthGuard
     // response. The browser decides again once the application boots there.
     if (state.loading || !state.isAuthenticated) {
       return options.redirectTo ?? auth.loginPath;
+    }
+
+    if (state.recoverySession) {
+      const enrollment = router.resolve(
+        options.enrollmentRedirectTo ?? auth.enrollmentPath
+      );
+
+      // Guarding the enrollment route itself must not loop.
+      return enrollment.path === to.path ? true : enrollment;
     }
 
     if (options.roles !== undefined && !auth.hasScopedRole(options.roles)) {

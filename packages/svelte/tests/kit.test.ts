@@ -31,7 +31,12 @@ import {
 } from './kitStubs';
 import KitProbe from './KitProbe.svelte';
 
-const auth = (session: typeof signedIn, config: Record<string, unknown> = {}) =>
+const recovering = { body: { ...(signedIn.body as object), recovery: true } };
+
+const auth = (
+  session: typeof signedIn | typeof recovering,
+  config: Record<string, unknown> = {}
+) =>
   createSeamlessAuth({
     apiHost: 'https://app.example.com',
     fetch: createAdapter({ 'GET /users/me': session }).fetch,
@@ -39,15 +44,18 @@ const auth = (session: typeof signedIn, config: Record<string, unknown> = {}) =>
     ...config,
   });
 
-const event = () => {
+const event = (path = '/app/orders') => {
   const depends = vi.fn();
-  const load: GuardLoadEvent = { url: new URL('http://localhost/app/orders'), depends };
+  const load: GuardLoadEvent = { url: new URL(`http://localhost${path}`), depends };
   return { load, depends };
 };
 
-async function redirectOf(guard: (event: GuardLoadEvent) => Promise<void>) {
+async function redirectOf(
+  guard: (event: GuardLoadEvent) => Promise<void>,
+  path?: string
+) {
   try {
-    await guard(event().load);
+    await guard(event(path).load);
     return null;
   } catch (thrown) {
     const location = (thrown as { location?: string }).location;
@@ -184,5 +192,24 @@ describe('load guards', () => {
         })
       )
     ).toBe('/app/denied');
+  });
+
+  it('sends a recovery session to factor enrollment, roles or not', async () => {
+    expect(await redirectOf(requireAuth(auth(recovering)))).toBe('/app/register-passkey');
+    expect(await redirectOf(requireAuth(auth(recovering), { roles: 'org:admin' }))).toBe(
+      '/app/register-passkey'
+    );
+    expect(
+      await redirectOf(requireAuth(auth(recovering, { enrollmentPath: '/enroll' })))
+    ).toBe('/app/enroll');
+    expect(
+      await redirectOf(requireAuth(auth(recovering), { enrollmentRedirectTo: '/setup' }))
+    ).toBe('/app/setup');
+  });
+
+  it('admits a recovery session to a guarded enrollment route without looping', async () => {
+    expect(
+      await redirectOf(requireAuth(auth(recovering)), '/app/register-passkey')
+    ).toBeNull();
   });
 });
