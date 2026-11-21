@@ -7,9 +7,11 @@
 import {
   confirmMagicLinkSignIn,
   finishMagicLinkSignIn,
-  getMagicLinkConfirmation,
   magicLinkConfirmationPrompt,
   type MagicLinkOutcome,
+  parseMagicLinkUrl,
+  takeMagicLinkParams,
+  verifyMagicLinkSignIn,
 } from '@seamless-auth/client';
 import { defineComponent, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
@@ -22,15 +24,22 @@ import { SaAuthLayout } from './AuthLayout';
  * Where an emailed magic link lands. Verifies the link once, tells the tab that
  * asked for it, and signs this tab in too when the link was opened in the same
  * browser. Opened on another device, the link is held and the screen asks
- * whether to sign the requesting device in.
+ * whether to sign the requesting device in. On the device that asked for it,
+ * the screen confirms without asking.
  */
 export const SaVerifyMagicLink = defineComponent({
   name: 'SaVerifyMagicLink',
   setup() {
     const auth = useSeamlessAuth();
     const navigation = useAuthNavigation();
-    const tokenParam = useRoute().query.token;
-    const token = typeof tokenParam === 'string' ? tokenParam : null;
+    const route = useRoute();
+    // Taken in setup, before the page's other scripts read the address. The
+    // route covers a memory history, where the window's address is not the
+    // route.
+    const taken = takeMagicLinkParams();
+    const tokenParam = route.query.token;
+    const token = typeof tokenParam === 'string' ? tokenParam : taken.token;
+    const code = parseMagicLinkUrl({ hash: route.hash }).code ?? taken.code;
 
     const outcome = ref<MagicLinkOutcome | null>(null);
     const error = ref('');
@@ -57,17 +66,16 @@ export const SaVerifyMagicLink = defineComponent({
       void navigation.dropQuery();
 
       // A link can be used once, and a mounted component verifies it once.
-      const result = await auth.client.verifyMagicLink(token);
+      const result = await verifyMagicLinkSignIn({ client: auth.client, token, code });
 
       if (!active) return;
 
-      if (result.error) {
-        const held = getMagicLinkConfirmation(result.error);
-        if (held) {
-          prompt.value = magicLinkConfirmationPrompt(held);
-          return;
-        }
+      if (result.status === 'confirmation-required') {
+        prompt.value = magicLinkConfirmationPrompt(result.confirmation);
+        return;
+      }
 
+      if (result.status === 'failed') {
         error.value = 'Failed to verify token';
         return;
       }
@@ -92,7 +100,7 @@ export const SaVerifyMagicLink = defineComponent({
       decision.value = 'confirming';
       confirmError.value = '';
 
-      const result = await confirmMagicLinkSignIn({ client: auth.client, token });
+      const result = await confirmMagicLinkSignIn({ client: auth.client, token, code });
 
       if (!active) return;
 

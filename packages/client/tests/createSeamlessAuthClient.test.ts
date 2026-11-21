@@ -376,6 +376,21 @@ describe('createSeamlessAuthClient', () => {
     expect(init).toEqual({ method: 'POST', body: '{}' });
   });
 
+  it('confirms a magic link with the code from its fragment', async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ message: 'Success' }),
+    });
+
+    const client = createSeamlessAuthClient({ apiHost: 'https://api.example.com' });
+    await client.confirmMagicLink('tok', 'c0de');
+
+    expect(mockFetchWithAuth.mock.calls[0][1]).toEqual({
+      method: 'POST',
+      body: JSON.stringify({ code: 'c0de' }),
+    });
+  });
+
   it('uses organization endpoints', async () => {
     const response = { ok: true };
     mockFetchWithAuth.mockResolvedValue(response);

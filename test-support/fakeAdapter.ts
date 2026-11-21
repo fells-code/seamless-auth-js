@@ -95,6 +95,21 @@ export const confirmationRequired: AdapterReply = {
   },
 };
 
+/** How an API with fragment codes holds a link: every time, saying whose device it is. */
+export const heldOnRequestingDevice: AdapterReply = {
+  status: 409,
+  body: {
+    ...(confirmationRequired.body as object),
+    message: 'Confirm to finish signing in.',
+    sameDevice: true,
+  },
+};
+
+export const heldOnOtherDevice: AdapterReply = {
+  status: 409,
+  body: { ...(confirmationRequired.body as object), sameDevice: false },
+};
+
 export const flush = () => new Promise(resolve => setTimeout(resolve, 0));
 
 export const passkeyPort = (supported: boolean) => ({

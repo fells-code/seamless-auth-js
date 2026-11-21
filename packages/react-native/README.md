@@ -154,18 +154,36 @@ rather than a user agent.
 
 Request one with `client.requestMagicLink()`, then poll
 `client.checkMagicLink()` every few seconds; the poll returns the session once
-the link has been used. If the app also receives the link as a universal link,
-call `client.verifyMagicLink(token)` and then `checkMagicLink()`. Bearer mode
-sends the sign-in's ephemeral token with the verify call, which is how the API
-knows this is the device that asked for the link.
+the link has been used. Bearer mode sends the sign-in's ephemeral token with
+the verify call, which is how the API knows this is the device that asked for
+the link.
 
-Opened on any other device, the link is not used until someone there approves
-it: `verifyMagicLink` fails with an error `getMagicLinkConfirmation(error)`
-recognises, carrying the requesting device's platform and request time
-(`magicLinkConfirmationPrompt(held)` phrases both). If the app handles links it
-did not ask for, show that and call `confirmMagicLinkSignIn({ client, token })`
-only when the person agrees. The requesting device is then signed in by its
-poll, and this one is not.
+The link is `<target>?token=<token>#code=<code>`. If the app also receives it,
+as a universal link or through its own scheme, read both values from the full
+incoming URL with `parseMagicLinkUrl(url)`. Take that URL from
+`Linking.getInitialURL()` and the `Linking` `url` event, which keep the
+fragment. Route parameters (for example expo-router's `useLocalSearchParams`)
+only carry the query, so the code is lost there.
+
+```ts
+const { token, code } = parseMagicLinkUrl(url);
+const result = await verifyMagicLinkSignIn({ client, token, code });
+
+if (result.status === 'verified') {
+  await client.checkMagicLink();
+} else if (result.status === 'confirmation-required') {
+  // Ask the person, then: confirmMagicLinkSignIn({ client, token, code })
+}
+```
+
+`verifyMagicLinkSignIn` confirms on its own when the API reports the link was
+opened on the device that asked for it. Opened on any other device, the link is
+not used until someone there approves it: the result carries the requesting
+device's platform and request time (`magicLinkConfirmationPrompt(confirmation)`
+phrases both). If the app handles links it did not ask for, show that and call
+`confirmMagicLinkSignIn({ client, token, code })` only when the person agrees.
+The requesting device is then signed in by its poll, and this one is not. A
+wrong code uses up the link.
 
 ### OAuth
 
