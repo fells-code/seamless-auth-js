@@ -32,9 +32,11 @@ export type { WebBrowserLike } from '@/ports/webBrowserOAuthRedirect';
 // The client surface an application reaches for, re-exported so a native app
 // installs one package.
 export {
+  confirmMagicLinkSignIn,
   createSeamlessAuthClient,
   encodePrfSalt,
   extractPasskeyPrfResult,
+  getMagicLinkConfirmation,
   getOAuthErrorCode,
   getPasskeyPolicyErrorCode,
   getWebAuthnErrorDetail,
@@ -44,11 +46,14 @@ export {
   hasRole,
   hasScopedRole,
   isUnauthenticated,
+  magicLinkConfirmationPrompt,
+  parseMagicLinkUrl,
   PasskeyCeremonyError,
   roleGrantsAccess,
   SeamlessAuthError,
   UntrustedOriginError,
   UntrustedRedirectError,
+  verifyMagicLinkSignIn,
 } from '@seamless-auth/client';
 export type {
   Credential,
@@ -59,6 +64,9 @@ export type {
   LoginInput,
   LoginMethod,
   LoginStartResult,
+  MagicLinkConfirmation,
+  MagicLinkParams,
+  MagicLinkVerification,
   MessageResult,
   OAuthErrorCode,
   OAuthProvider,

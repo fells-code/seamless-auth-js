@@ -7,7 +7,8 @@
   Where an emailed magic link lands. Verifies the link once, tells the tab that
   asked for it, and signs this tab in too when the link was opened in the same
   browser. Opened on another device, the link is held and the screen asks
-  whether to sign the requesting device in.
+  whether to sign the requesting device in. On the device that asked for it,
+  the screen confirms without asking.
 -->
 <script module lang="ts">
   // Tokens this page has already spent. A link can be used once, and a screen
@@ -20,9 +21,10 @@
   import {
     confirmMagicLinkSignIn,
     finishMagicLinkSignIn,
-    getMagicLinkConfirmation,
     magicLinkConfirmationPrompt,
     type MagicLinkOutcome,
+    takeMagicLinkParams,
+    verifyMagicLinkSignIn,
   } from '@seamless-auth/client';
   import { onMount } from 'svelte';
 
@@ -38,6 +40,9 @@
   let confirmError = $state('');
   let heldToken: string | null = null;
   let active = true;
+  // Taken as the component starts, before the page's other scripts read the
+  // address. A server render finds no window and takes nothing.
+  const taken = takeMagicLinkParams();
 
   async function confirm() {
     if (!heldToken || decision === 'confirming') return;
@@ -45,7 +50,11 @@
     decision = 'confirming';
     confirmError = '';
 
-    const result = await confirmMagicLinkSignIn({ client: auth.client, token: heldToken });
+    const result = await confirmMagicLinkSignIn({
+      client: auth.client,
+      token: heldToken,
+      code: taken.code,
+    });
 
     if (!active) return;
 
@@ -67,7 +76,7 @@
     let redirect: ReturnType<typeof setTimeout> | undefined;
 
     void (async () => {
-      const token = navigator.query('token');
+      const token = navigator.query('token') ?? taken.token;
 
       if (!token) {
         error = 'Missing token for verification.';
@@ -84,20 +93,23 @@
       void navigator.dropQuery().catch(() => undefined);
 
       // A link can be used once, and a mounted screen verifies it once.
-      const result = await auth.client.verifyMagicLink(token);
+      const result = await verifyMagicLinkSignIn({
+        client: auth.client,
+        token,
+        code: taken.code,
+      });
 
       if (!active) return;
 
-      if (result.error) {
-        const held = getMagicLinkConfirmation(result.error);
-        if (held) {
-          // Held, not used: a remount may ask again.
-          spent.delete(token);
-          heldToken = token;
-          prompt = magicLinkConfirmationPrompt(held);
-          return;
-        }
+      if (result.status === 'confirmation-required') {
+        // Held, not used: a remount may ask again.
+        spent.delete(token);
+        heldToken = token;
+        prompt = magicLinkConfirmationPrompt(result.confirmation);
+        return;
+      }
 
+      if (result.status === 'failed') {
         error = 'Failed to verify token';
         return;
       }

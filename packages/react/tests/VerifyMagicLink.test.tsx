@@ -376,7 +376,7 @@ describe('VerifyMagicLink', () => {
       expect(await screen.findByRole('status')).toHaveTextContent(
         /return to your other device/i
       );
-      expect(mockAuthClient.confirmMagicLink).toHaveBeenCalledWith('abc123');
+      expect(mockAuthClient.confirmMagicLink).toHaveBeenCalledWith('abc123', undefined);
       expect(refreshSession).not.toHaveBeenCalled();
 
       act(() => {
@@ -450,7 +450,89 @@ describe('VerifyMagicLink', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(
       /return to your other device/i
     );
-    expect(mockAuthClient.confirmMagicLink).toHaveBeenCalledWith('abc123');
+    expect(mockAuthClient.confirmMagicLink).toHaveBeenCalledWith('abc123', undefined);
+  });
+
+  describe('the code in the link fragment', () => {
+    const held = (sameDevice: boolean) => ({
+      data: null,
+      error: new SeamlessAuthError('Confirm to finish signing in.', 409, {
+        error: 'confirmation_required',
+        message: 'Confirm to finish signing in.',
+        sameDevice,
+        requestedFrom: { deviceClass: 'macos', requestedAt: '2026-10-16T14:05:00.000Z' },
+      }),
+    });
+
+    beforeEach(() => {
+      window.history.replaceState(null, '', '/verify-magiclink?token=abc123#code=c0de');
+      (useSearchParams as jest.Mock).mockReturnValue([
+        new URLSearchParams('?token=abc123'),
+        setSearchParams,
+      ]);
+      mockAuthClient.confirmMagicLink.mockResolvedValue({
+        data: { message: 'Success' },
+        error: null,
+      });
+    });
+
+    afterEach(() => {
+      window.history.replaceState(null, '', '/');
+    });
+
+    test('is stripped from the address before verifying', () => {
+      mockAuthClient.verifyMagicLink.mockReturnValue(new Promise(() => undefined));
+
+      render(<VerifyMagicLink />);
+
+      expect(window.location.search).toBe('');
+      expect(window.location.hash).toBe('');
+    });
+
+    test('confirms without asking on the device that asked for the link', async () => {
+      mockAuthClient.verifyMagicLink.mockResolvedValue(held(true));
+
+      render(<VerifyMagicLink />);
+
+      expect(
+        await screen.findByText(/login verified\. redirecting/i)
+      ).toBeInTheDocument();
+      expect(mockAuthClient.confirmMagicLink).toHaveBeenCalledWith('abc123', 'c0de');
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+
+      act(() => {
+        jest.advanceTimersByTime(900);
+      });
+      expect(navigate).toHaveBeenCalledWith('/');
+    });
+
+    test('asks first on another device, then confirms with the code', async () => {
+      mockAuthClient.verifyMagicLink.mockResolvedValue(held(false));
+
+      render(<VerifyMagicLink />);
+
+      fireEvent.click(
+        await screen.findByRole('button', { name: /yes, sign in that device/i })
+      );
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        /return to your other device/i
+      );
+      expect(mockAuthClient.confirmMagicLink).toHaveBeenCalledWith('abc123', 'c0de');
+    });
+
+    test('reports a code the API refuses', async () => {
+      mockAuthClient.verifyMagicLink.mockResolvedValue(held(true));
+      mockAuthClient.confirmMagicLink.mockResolvedValue({
+        data: null,
+        error: new SeamlessAuthError('Invalid code', 400),
+      });
+
+      render(<VerifyMagicLink />);
+
+      expect(await screen.findByText(/failed to verify token/i)).toBeInTheDocument();
+      expect(refreshSession).not.toHaveBeenCalled();
+    });
   });
 
   test('shows spinner during verification', () => {
