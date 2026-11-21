@@ -23,6 +23,8 @@ import { createSeamlessAuthRoutes, SaOtpInput } from '../src/router';
 import {
   confirmationRequired,
   createAdapter,
+  heldOnOtherDevice,
+  heldOnRequestingDevice,
   passkeyPort,
   signedIn,
   signedOut,
@@ -365,6 +367,58 @@ describe('magic link screens', () => {
 
     expect(text()).toContain('You can ignore the email');
     expect(adapter.called('POST', '/magic-link/verify/t1/confirm')).toHaveLength(0);
+  });
+
+  it('confirms with the fragment code, without asking, on the requesting device', async () => {
+    const { adapter } = await open('/verify-magiclink?token=t1#code=c0de', {
+      'GET /users/me': signedIn,
+      'GET /magic-link/verify/t1': heldOnRequestingDevice,
+      'POST /magic-link/verify/t1/confirm': ok,
+    });
+
+    expect(bodyOf(adapter, 'POST', '/magic-link/verify/t1/confirm')).toEqual({
+      code: 'c0de',
+    });
+    expect(text()).toContain('Login verified. Redirecting...');
+    expect(text()).not.toContain('Confirm this sign-in');
+    expect(url()).toBe('/verify-magiclink');
+  });
+
+  it('asks on another device, then confirms with the fragment code', async () => {
+    const { adapter } = await open('/verify-magiclink?token=t1#code=c0de', {
+      'GET /magic-link/verify/t1': heldOnOtherDevice,
+      'POST /magic-link/verify/t1/confirm': ok,
+    });
+
+    expect(heading()).toBe('Confirm this sign-in');
+    expect(adapter.called('POST', '/magic-link/verify/t1/confirm')).toHaveLength(0);
+
+    await click('Yes, sign in that device');
+
+    expect(bodyOf(adapter, 'POST', '/magic-link/verify/t1/confirm')).toEqual({
+      code: 'c0de',
+    });
+  });
+
+  it('reports a code the API refuses', async () => {
+    await open('/verify-magiclink?token=t1#code=wrong', {
+      'GET /magic-link/verify/t1': heldOnRequestingDevice,
+      'POST /magic-link/verify/t1/confirm': { status: 400, body: { error: 'Invalid' } },
+    });
+
+    expect(text()).toContain('Failed to verify token');
+  });
+
+  it('strips the token and code from the address bar', async () => {
+    window.history.replaceState(null, '', '/verify-magiclink?token=t1#code=c0de');
+
+    await open('/verify-magiclink?token=t1', {
+      'GET /magic-link/verify/t1': heldOnOtherDevice,
+    });
+
+    expect(window.location.search).toBe('');
+    expect(window.location.hash).toBe('');
+    window.history.replaceState(null, '', '/');
   });
 
   it('reports a link that cannot be verified, or no link at all', async () => {

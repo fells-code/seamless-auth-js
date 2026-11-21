@@ -10,6 +10,9 @@ import {
   beginSignIn,
   completeOAuthCallback,
   confirmMagicLinkSignIn,
+  parseMagicLinkUrl,
+  takeMagicLinkParams,
+  verifyMagicLinkSignIn,
   describeMagicLinkDevice,
   detectPasskeySupport,
   enrollPasskey,
@@ -444,11 +447,38 @@ describe('magic link confirmation', () => {
     const result = await confirmMagicLinkSignIn({
       client: { confirmMagicLink },
       token: 'tok',
+      code: 'the-code',
     });
 
     expect(result.error).toBeNull();
-    expect(confirmMagicLink).toHaveBeenCalledWith('tok');
+    expect(confirmMagicLink).toHaveBeenCalledWith('tok', 'the-code');
     expect(FakeChannel.posted).toEqual([{ type: MAGIC_LINK_SUCCESS_MESSAGE }]);
+  });
+
+  it('confirms without a code for a link from an older API', async () => {
+    const confirmMagicLink = jest.fn().mockResolvedValue(ok({ message: 'Success' }));
+
+    await confirmMagicLinkSignIn({
+      client: { confirmMagicLink },
+      token: 'tok',
+      code: null,
+    });
+
+    expect(confirmMagicLink).toHaveBeenCalledWith('tok', undefined);
+  });
+
+  it('reads whether the link was opened on the requesting device', () => {
+    expect(getMagicLinkConfirmation(held({ ...body, sameDevice: true }))).toEqual({
+      ...requestedFrom,
+      sameDevice: true,
+    });
+    expect(getMagicLinkConfirmation(held({ ...body, sameDevice: false }))).toEqual({
+      ...requestedFrom,
+      sameDevice: false,
+    });
+    expect(getMagicLinkConfirmation(held({ ...body, sameDevice: 'yes' }))).toEqual(
+      requestedFrom
+    );
   });
 
   it('reports a refused confirmation without announcing a sign-in', async () => {
@@ -459,6 +489,161 @@ describe('magic link confirmation', () => {
 
     expect(result.error).toBeInstanceOf(SeamlessAuthError);
     expect(FakeChannel.posted).toEqual([]);
+  });
+});
+
+describe('verifyMagicLinkSignIn', () => {
+  const held = (sameDevice?: boolean) => ({
+    data: null,
+    error: new SeamlessAuthError('Confirm to finish signing in.', 409, {
+      error: 'confirmation_required',
+      message: 'Confirm to finish signing in.',
+      ...(sameDevice === undefined ? {} : { sameDevice }),
+      requestedFrom: { deviceClass: 'macos', requestedAt: '2026-10-16T14:05:00.000Z' },
+    }),
+  });
+  const setup = (verify: unknown, confirm: unknown = ok({ message: 'Success' })) => ({
+    verifyMagicLink: jest.fn().mockResolvedValue(verify),
+    confirmMagicLink: jest.fn().mockResolvedValue(confirm),
+  });
+
+  it('confirms with the code, without asking, on the requesting device', async () => {
+    const client = setup(held(true));
+
+    const result = await verifyMagicLinkSignIn({ client, token: 'tok', code: 'c0de' });
+
+    expect(result).toEqual({ status: 'verified' });
+    expect(client.confirmMagicLink).toHaveBeenCalledWith('tok', 'c0de');
+  });
+
+  it('asks first when the link was opened on another device', async () => {
+    const client = setup(held(false));
+
+    const result = await verifyMagicLinkSignIn({ client, token: 'tok', code: 'c0de' });
+
+    expect(result).toEqual({
+      status: 'confirmation-required',
+      confirmation: {
+        deviceClass: 'macos',
+        requestedAt: '2026-10-16T14:05:00.000Z',
+        sameDevice: false,
+      },
+    });
+    expect(client.confirmMagicLink).not.toHaveBeenCalled();
+  });
+
+  it('asks first when an older API leaves sameDevice out', async () => {
+    const client = setup(held());
+
+    const result = await verifyMagicLinkSignIn({ client, token: 'tok', code: null });
+
+    expect(result.status).toBe('confirmation-required');
+    expect(client.confirmMagicLink).not.toHaveBeenCalled();
+  });
+
+  it('treats a 200 from an older API as verified', async () => {
+    const client = setup(ok({ message: 'Success' }));
+
+    const result = await verifyMagicLinkSignIn({ client, token: 'tok' });
+
+    expect(result).toEqual({ status: 'verified' });
+    expect(client.confirmMagicLink).not.toHaveBeenCalled();
+  });
+
+  it('fails when the API refuses the code', async () => {
+    const client = setup(held(true), failed(400));
+
+    const result = await verifyMagicLinkSignIn({ client, token: 'tok', code: 'wrong' });
+
+    expect(result.status).toBe('failed');
+    expect(client.confirmMagicLink).toHaveBeenCalledWith('tok', 'wrong');
+  });
+
+  it('fails on any other verify error', async () => {
+    const client = setup(failed(404));
+
+    expect((await verifyMagicLinkSignIn({ client, token: 'tok' })).status).toBe('failed');
+  });
+});
+
+describe('magic link URL', () => {
+  it('reads the token from the query and the code from the fragment', () => {
+    expect(
+      parseMagicLinkUrl(
+        'https://app.example.com/verify-magiclink?token=t%2B1#code=abc-_9'
+      )
+    ).toEqual({ token: 't+1', code: 'abc-_9' });
+  });
+
+  it('reads a custom-scheme link and keeps its fragment', () => {
+    expect(
+      parseMagicLinkUrl('myapp://verify-magiclink?next=%2Fhome&token=tok#x=1&code=c0de')
+    ).toEqual({ token: 'tok', code: 'c0de' });
+  });
+
+  it('does not take a code from the query', () => {
+    expect(parseMagicLinkUrl('https://a.test/v?token=tok&code=leaked')).toEqual({
+      token: 'tok',
+      code: null,
+    });
+  });
+
+  it('reads a location', () => {
+    expect(parseMagicLinkUrl({ search: '?token=tok', hash: '#code=c0de' })).toEqual({
+      token: 'tok',
+      code: 'c0de',
+    });
+    expect(parseMagicLinkUrl({})).toEqual({ token: null, code: null });
+    expect(parseMagicLinkUrl('https://a.test/v?token=&code')).toEqual({
+      token: null,
+      code: null,
+    });
+  });
+
+  it('keeps a value it cannot decode as it is', () => {
+    expect(parseMagicLinkUrl('https://a.test/v?token=%E0%A4%A#code=a')).toEqual({
+      token: '%E0%A4%A',
+      code: 'a',
+    });
+  });
+
+  it('strips the token and code from the address bar', () => {
+    window.history.replaceState(
+      { kept: true },
+      '',
+      '/verify-magiclink?token=tok&lang=en#code=c0de&tab=2'
+    );
+
+    expect(takeMagicLinkParams()).toEqual({ token: 'tok', code: 'c0de' });
+    expect(window.location.pathname).toBe('/verify-magiclink');
+    expect(window.location.search).toBe('?lang=en');
+    expect(window.location.hash).toBe('#tab=2');
+    expect(window.history.state).toEqual({ kept: true });
+
+    window.history.replaceState(null, '', '/verify-magiclink?token=tok#code=c0de');
+    takeMagicLinkParams();
+    expect(window.location.href).toBe('http://localhost/verify-magiclink');
+  });
+
+  it('leaves an address without a link alone', () => {
+    window.history.replaceState(null, '', '/elsewhere?x=1#y');
+    const replaceState = jest.spyOn(window.history, 'replaceState');
+
+    expect(takeMagicLinkParams()).toEqual({ token: null, code: null });
+    expect(replaceState).not.toHaveBeenCalled();
+    replaceState.mockRestore();
+  });
+
+  it('still returns the values when the history refuses a change', () => {
+    window.history.replaceState(null, '', '/v?token=tok#code=c0de');
+    const replaceState = jest
+      .spyOn(window.history, 'replaceState')
+      .mockImplementation(() => {
+        throw new Error('SecurityError');
+      });
+
+    expect(takeMagicLinkParams()).toEqual({ token: 'tok', code: 'c0de' });
+    replaceState.mockRestore();
   });
 });
 

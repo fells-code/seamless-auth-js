@@ -17,9 +17,11 @@ import { SeamlessAuth } from '@seamless-auth/angular';
 import {
   confirmMagicLinkSignIn,
   finishMagicLinkSignIn,
-  getMagicLinkConfirmation,
   magicLinkConfirmationPrompt,
   type MagicLinkOutcome,
+  parseMagicLinkUrl,
+  takeMagicLinkParams,
+  verifyMagicLinkSignIn,
 } from '@seamless-auth/client';
 
 import { SaAuthLayout } from './auth-layout.component';
@@ -29,7 +31,8 @@ import { injectAuthNavigation } from './navigation';
  * Where an emailed magic link lands. Verifies the link once, tells the tab that
  * asked for it, and signs this tab in too when the link was opened in the same
  * browser. Opened on another device, the link is held and the screen asks
- * whether to sign the requesting device in.
+ * whether to sign the requesting device in. On the device that asked for it,
+ * the screen confirms without asking.
  */
 @Component({
   selector: 'sa-verify-magic-link',
@@ -113,7 +116,14 @@ import { injectAuthNavigation } from './navigation';
 export class SaVerifyMagicLink {
   private readonly auth = inject(SeamlessAuth);
   private readonly navigation = injectAuthNavigation();
-  private readonly token = inject(ActivatedRoute).snapshot.queryParamMap.get('token');
+  private readonly route = inject(ActivatedRoute).snapshot;
+  // Taken as the component is created, before the page's other scripts read the
+  // address. A server render finds no window and takes nothing; the route
+  // covers a router whose address is not the window's.
+  private readonly taken = takeMagicLinkParams();
+  private readonly token = this.route.queryParamMap.get('token') ?? this.taken.token;
+  private readonly code =
+    parseMagicLinkUrl({ hash: this.route.fragment ?? '' }).code ?? this.taken.code;
 
   readonly outcome = signal<MagicLinkOutcome | null>(null);
   readonly error = signal('');
@@ -132,6 +142,7 @@ export class SaVerifyMagicLink {
     const { error } = await confirmMagicLinkSignIn({
       client: this.auth.client,
       token: this.token,
+      code: this.code,
     });
 
     if (error) {
@@ -168,17 +179,20 @@ export class SaVerifyMagicLink {
 
       // A link can be used once. The component verifies exactly once per
       // instance, and Angular does not mount a route component twice.
-      const { error } = await this.auth.client.verifyMagicLink(this.token);
+      const result = await verifyMagicLinkSignIn({
+        client: this.auth.client,
+        token: this.token,
+        code: this.code,
+      });
 
       if (!active) return;
 
-      if (error) {
-        const held = getMagicLinkConfirmation(error);
-        if (held) {
-          this.prompt.set(magicLinkConfirmationPrompt(held));
-          return;
-        }
+      if (result.status === 'confirmation-required') {
+        this.prompt.set(magicLinkConfirmationPrompt(result.confirmation));
+        return;
+      }
 
+      if (result.status === 'failed') {
         this.error.set('Failed to verify token');
         return;
       }

@@ -1130,47 +1130,46 @@ const interval = setInterval(async () => {
 }, 5000);
 ```
 
-The landing route verifies the token from the query string, then refreshes its own session:
+The landing route reads the token from the query and the code from the fragment, verifies the link,
+then refreshes its own session:
 
 ```tsx
 function CustomMagicLinkLanding() {
-  // plus: import { useEffect, useState } from 'react', and
-  // getMagicLinkConfirmation, magicLinkConfirmationPrompt from '@seamless-auth/client'
+  // plus: import { useEffect, useState } from 'react', and finishMagicLinkSignIn,
+  // magicLinkConfirmationPrompt, takeMagicLinkParams, verifyMagicLinkSignIn
+  // from '@seamless-auth/client'
   const { refreshSession } = useAuth();
   const authClient = useAuthClient();
+  // Read once, as the screen starts: this also strips both from the address bar.
+  const [{ token, code }] = useState(takeMagicLinkParams);
   const [prompt, setPrompt] = useState('');
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get('token');
     if (!token) return;
 
-    void authClient.verifyMagicLink(token).then(async ({ error }) => {
-      if (!error) {
-        // Refresh here too. This tab set the cookie, but its provider state
-        // was loaded before the cookie existed.
-        await refreshSession();
-        return;
+    void verifyMagicLinkSignIn({ client: authClient, token, code }).then(async result => {
+      if (result.status === 'verified') {
+        await finishMagicLinkSignIn({ client: authClient, refreshSession });
+      } else if (result.status === 'confirmation-required') {
+        setPrompt(magicLinkConfirmationPrompt(result.confirmation));
       }
-
-      const held = getMagicLinkConfirmation(error);
-      if (held) setPrompt(magicLinkConfirmationPrompt(held));
     });
-  }, [authClient, refreshSession]);
+  }, [authClient, refreshSession, token, code]);
 
   // Opened on another device: ask before calling confirmMagicLinkSignIn.
   return <p>{prompt || 'Finishing sign-in...'}</p>;
 }
 ```
 
-A link opened on a device other than the one that asked for it is not used straight away. The
-verify call fails with a `409` that `getMagicLinkConfirmation(error)` (from `@seamless-auth/client`)
-reads, giving the requesting device's platform and when it asked. Show that to the reader, and only
-if they approve call `confirmMagicLinkSignIn({ client: authClient, token })`. That signs in the
-device that asked for the link, through its poll, not this one, so tell the reader to go back to
-it. The bundled `/verify-magiclink` screen does all of this, with a "No, this wasn't me" option that
-changes nothing.
+`verifyMagicLinkSignIn` confirms on its own when the API reports the link was opened on the device
+that asked for it. A link opened on any other device is not used straight away: the result carries
+the requesting device's platform and when it asked. Show that to the reader, and only if they approve
+call `confirmMagicLinkSignIn({ client: authClient, token, code })`. That signs in the device that
+asked for the link, through its poll, not this one, so tell the reader to go back to it. A wrong code
+uses up the link. The bundled `/verify-magiclink` screen does all of this, with a "No, this wasn't
+me" option that changes nothing.
 
-The auth API emails a link pointing at `/verify-magiclink?token=...`, so a custom app must serve that
+The auth API emails a link pointing at `/verify-magiclink?token=...#code=...`, so a custom app must serve that
 path.
 
 ### Credential management

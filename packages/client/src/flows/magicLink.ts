@@ -100,11 +100,17 @@ export type MagicLinkDeviceClass =
   | 'bot'
   | 'unknown';
 
-/** Who asked for a link that was opened on another device. */
+/** Who asked for a link that `verifyMagicLink()` held for confirmation. */
 export interface MagicLinkConfirmation {
   deviceClass: MagicLinkDeviceClass;
   /** ISO 8601 timestamp of the request. */
   requestedAt: string;
+  /**
+   * True when the API recognised this device as the one that asked for the
+   * link. Newer APIs hold every link, so a client confirms these without
+   * asking. Older APIs leave it out and only hold links opened elsewhere.
+   */
+  sameDevice?: boolean;
 }
 
 const DEVICE_LABELS: Record<MagicLinkDeviceClass, string> = {
@@ -121,7 +127,11 @@ const DEVICE_LABELS: Record<MagicLinkDeviceClass, string> = {
 function readConfirmation(body: unknown): MagicLinkConfirmation | undefined {
   if (typeof body !== 'object' || body === null) return undefined;
 
-  const { error, requestedFrom } = body as { error?: unknown; requestedFrom?: unknown };
+  const { error, requestedFrom, sameDevice } = body as {
+    error?: unknown;
+    requestedFrom?: unknown;
+    sameDevice?: unknown;
+  };
   if (error !== 'confirmation_required') return undefined;
 
   const from = (
@@ -135,6 +145,7 @@ function readConfirmation(body: unknown): MagicLinkConfirmation | undefined {
         ? (from.deviceClass as MagicLinkDeviceClass)
         : 'unknown',
     requestedAt: typeof from.requestedAt === 'string' ? from.requestedAt : '',
+    ...(typeof sameDevice === 'boolean' ? { sameDevice } : {}),
   };
 }
 
@@ -191,6 +202,151 @@ export function magicLinkConfirmationPrompt(
   return `A sign-in was requested from ${device} on ${when}.`;
 }
 
+/** The two values an emailed magic link carries. */
+export interface MagicLinkParams {
+  /** From the query (`?token=`). It finds the link. */
+  token: string | null;
+  /**
+   * From the fragment (`#code=`), which never reaches a server, a Referer or an
+   * access log. It proves the reader holds the whole link. Links from older
+   * APIs carry none.
+   */
+  code: string | null;
+}
+
+function readParam(part: string, name: string): string | null {
+  for (const pair of part.split('&')) {
+    const eq = pair.indexOf('=');
+    const key = eq === -1 ? pair : pair.slice(0, eq);
+    if (safeDecode(key) !== name) continue;
+
+    const value = safeDecode(eq === -1 ? '' : pair.slice(eq + 1));
+    return value ? value : null;
+  }
+
+  return null;
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '));
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * Read `token` from the query and `code` from the fragment of a magic link.
+ * Takes a full URL (`https://...`, a universal link, or a custom scheme such
+ * as `myapp://verify-magiclink?token=...#code=...`) or just the
+ * `search`/`hash` of a location.
+ *
+ * It parses by hand rather than with `URL`, which some React Native runtimes
+ * only partly implement and which does not parse every custom scheme.
+ */
+export function parseMagicLinkUrl(
+  url: string | { search?: string; hash?: string }
+): MagicLinkParams {
+  let search: string;
+  let hash: string;
+
+  if (typeof url === 'string') {
+    const hashAt = url.indexOf('#');
+    hash = hashAt === -1 ? '' : url.slice(hashAt + 1);
+    const beforeHash = hashAt === -1 ? url : url.slice(0, hashAt);
+    const queryAt = beforeHash.indexOf('?');
+    search = queryAt === -1 ? '' : beforeHash.slice(queryAt + 1);
+  } else {
+    search = (url.search ?? '').replace(/^\?/, '');
+    hash = (url.hash ?? '').replace(/^#/, '');
+  }
+
+  return { token: readParam(search, 'token'), code: readParam(hash, 'code') };
+}
+
+/**
+ * Read the magic link this page was opened with, then take `token` and `code`
+ * out of the address bar with `history.replaceState`, so neither reaches
+ * history, a Referer or a script that reads the URL later. Call it as early as
+ * the page allows, before analytics or other scripts run.
+ *
+ * Other query parameters and fragment values are kept. Outside a browser it
+ * returns two nulls and does nothing.
+ */
+export function takeMagicLinkParams(): MagicLinkParams {
+  if (typeof window === 'undefined' || !window.location) {
+    return { token: null, code: null };
+  }
+
+  const { location, history } = window;
+  const params = parseMagicLinkUrl(location);
+
+  if (params.token === null && params.code === null) return params;
+
+  const query = new URLSearchParams(location.search);
+  query.delete('token');
+  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+  fragment.delete('code');
+
+  const search = query.toString();
+  const hash = fragment.toString();
+  const stripped = `${location.pathname}${search ? `?${search}` : ''}${hash ? `#${hash}` : ''}`;
+
+  try {
+    history.replaceState(history.state, '', stripped);
+  } catch {
+    // A sandboxed frame can refuse; the values were still read.
+  }
+
+  return params;
+}
+
+/** Where `verifyMagicLinkSignIn()` leaves a link. */
+export type MagicLinkVerification =
+  /** The link is used. Continue with `finishMagicLinkSignIn()`. */
+  | { status: 'verified' }
+  /** Opened on another device. Ask the reader, then `confirmMagicLinkSignIn()`. */
+  | { status: 'confirmation-required'; confirmation: MagicLinkConfirmation }
+  | { status: 'failed'; error: unknown };
+
+/**
+ * Verify an emailed link, the first step on the screen it lands on.
+ *
+ * Newer APIs hold every link until it is confirmed with the code from its
+ * fragment. When they report the link was opened on the device that asked for
+ * it, this confirms at once, so the reader is not asked about their own
+ * request. Older APIs use the link on the verify call itself from that device,
+ * which also ends here as `verified`.
+ *
+ * A link can be used once, so a screen that may mount twice has to reuse the
+ * promise this returns rather than call it again.
+ */
+export async function verifyMagicLinkSignIn(deps: {
+  client: Pick<SeamlessAuthClient, 'verifyMagicLink' | 'confirmMagicLink'>;
+  token: string;
+  code?: string | null;
+}): Promise<MagicLinkVerification> {
+  const verified = await deps.client.verifyMagicLink(deps.token);
+
+  if (!verified.error) return { status: 'verified' };
+
+  const confirmation = getMagicLinkConfirmation(verified.error);
+  if (!confirmation) return { status: 'failed', error: verified.error };
+
+  if (confirmation.sameDevice !== true) {
+    return { status: 'confirmation-required', confirmation };
+  }
+
+  const confirmed = await deps.client.confirmMagicLink(
+    deps.token,
+    deps.code ?? undefined
+  );
+
+  return confirmed.error
+    ? { status: 'failed', error: confirmed.error }
+    : { status: 'verified' };
+}
+
 /**
  * Approve a link that `verifyMagicLink()` held for confirmation. The device
  * that asked for it is signed in through its own poll; this one is not, so on
@@ -199,8 +355,10 @@ export function magicLinkConfirmationPrompt(
 export async function confirmMagicLinkSignIn(deps: {
   client: Pick<SeamlessAuthClient, 'confirmMagicLink'>;
   token: string;
+  /** The `code` from the link's fragment. Newer APIs require it. */
+  code?: string | null;
 }): Promise<SeamlessAuthResult<MessageResult>> {
-  const result = await deps.client.confirmMagicLink(deps.token);
+  const result = await deps.client.confirmMagicLink(deps.token, deps.code ?? undefined);
 
   // The requesting tab may be in this browser after all (a changed network
   // address is enough to miss the device match), and is then told at once.
@@ -223,10 +381,11 @@ export async function confirmMagicLinkSignIn(deps: {
  * pre-auth cookie. Opened on another device there is nothing to collect, and
  * the outcome is `elsewhere`.
  *
- * Call it only after `verifyMagicLink()` succeeds. When the link was opened on
- * a device other than the one that asked for it, verification fails with an
- * error `getMagicLinkConfirmation()` recognises instead, and the flow continues
- * with `confirmMagicLinkSignIn()`.
+ * Call it only after `verifyMagicLinkSignIn()` reports `verified` (or, on an
+ * older API, after `verifyMagicLink()` succeeds). When the link was opened on a
+ * device other than the one that asked for it, verification reports
+ * `confirmation-required` instead, and the flow continues with
+ * `confirmMagicLinkSignIn()`.
  *
  * A link can be used once, so verification itself stays with the caller, which
  * has to make sure a remounted screen reuses the first request rather than

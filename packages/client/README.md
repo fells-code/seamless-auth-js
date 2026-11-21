@@ -62,26 +62,28 @@ same distinction off any result error.
 Each bundled screen in a binding is a thin view over one of these. A custom UI in
 any framework can call them directly.
 
-| Flow                                                                         | What it does                                                                                                       |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `beginSignIn(actions, { identifier, passkeySupported, configuredMethods })`  | Starts a login and runs the passkey ceremony when it can. Resolves to `signed_in`, `choose_method` or `error`      |
-| `registerWithEmail(client, email)`                                           | Starts registration. The next step is the email code                                                               |
-| `requestOtp` / `verifyOtp`                                                   | Sends and checks a code for a channel (`email`, `phone`) and flow (`login`, `register`), and says where to go next |
-| `watchMagicLink({ client, refreshSession, onSignedIn })`                     | In the tab that asked for a link, waits for it to be used (cross-tab message or poll). Returns a stop function     |
-| `finishMagicLinkSignIn({ client, refreshSession })`                          | On the page the link lands on, after `client.verifyMagicLink(token)` succeeds                                      |
-| `getMagicLinkConfirmation(error)`, `magicLinkConfirmationPrompt(held)`       | When verifying fails because the link was opened on another device: who asked for it, and when                     |
-| `confirmMagicLinkSignIn({ client, token })`                                  | Approves that link once the reader agrees. Signs in the device that asked for it, not this one                     |
-| `startOAuthSignIn` / `completeOAuthCallback`                                 | Starts a provider sign-in and finishes it on the redirect URI                                                      |
-| `enrollPasskey({ client, refreshSession }, attachment?)`                     | Enrols a passkey for the signed-in user, labelled with this device                                                 |
-| `loadLoginMethods`, `fallbackSignInOptions`, `hasNonPasskeyLoginMethod`      | What the instance allows, and what to offer a user                                                                 |
-| `detectPasskeySupport(port)`                                                 | Whether this device can use a passkey                                                                              |
-| `safeReturnPath`, `inAppPath`                                                | Keep a destination inside the application                                                                          |
-| `loadRecoveryOptions(client)`                                                | Whether the instance offers recovery codes and self-service account recovery                                       |
-| `generateRecoveryCodesWithStepUp({ client, verifyStepUp })`                  | Generates a set of recovery codes, stepping up first when the API asks for it                                      |
-| `recoveryCancelTokenFromHash(hash)`, `cancelRecoveryFromLink(client, token)` | The cancel page a recovery notice links to                                                                         |
-| `recoveryErrorMessage(error)`, `recoveryCodesText(codes)`                    | Copy for recovery failures, and a set of codes as a text file                                                      |
-| `passkeyKind`, `passkeyDisplayName`                                          | How a passkey management screen labels a credential                                                                |
-| `isValidEmail`, `isValidPhoneNumber`, `parseUserAgent`, `formatCountdown`    | Small shared helpers                                                                                               |
+| Flow                                                                         | What it does                                                                                                                                            |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `beginSignIn(actions, { identifier, passkeySupported, configuredMethods })`  | Starts a login and runs the passkey ceremony when it can. Resolves to `signed_in`, `choose_method` or `error`                                           |
+| `registerWithEmail(client, email)`                                           | Starts registration. The next step is the email code                                                                                                    |
+| `requestOtp` / `verifyOtp`                                                   | Sends and checks a code for a channel (`email`, `phone`) and flow (`login`, `register`), and says where to go next                                      |
+| `watchMagicLink({ client, refreshSession, onSignedIn })`                     | In the tab that asked for a link, waits for it to be used (cross-tab message or poll). Returns a stop function                                          |
+| `takeMagicLinkParams()`, `parseMagicLinkUrl(url)`                            | On the page the link lands on, reads `token` from the query and `code` from the fragment. `take` also strips both from the address bar                  |
+| `verifyMagicLinkSignIn({ client, token, code })`                             | Verifies the link, and confirms at once when it was opened on the device that asked for it. Resolves to `verified`, `confirmation-required` or `failed` |
+| `finishMagicLinkSignIn({ client, refreshSession })`                          | After `verifyMagicLinkSignIn` reports `verified`, signs in this tab when it can                                                                         |
+| `getMagicLinkConfirmation(error)`, `magicLinkConfirmationPrompt(held)`       | When verifying fails because the link was opened on another device: who asked for it, and when                                                          |
+| `confirmMagicLinkSignIn({ client, token, code })`                            | Approves that link once the reader agrees. Signs in the device that asked for it, not this one                                                          |
+| `startOAuthSignIn` / `completeOAuthCallback`                                 | Starts a provider sign-in and finishes it on the redirect URI                                                                                           |
+| `enrollPasskey({ client, refreshSession }, attachment?)`                     | Enrols a passkey for the signed-in user, labelled with this device                                                                                      |
+| `loadLoginMethods`, `fallbackSignInOptions`, `hasNonPasskeyLoginMethod`      | What the instance allows, and what to offer a user                                                                                                      |
+| `detectPasskeySupport(port)`                                                 | Whether this device can use a passkey                                                                                                                   |
+| `safeReturnPath`, `inAppPath`                                                | Keep a destination inside the application                                                                                                               |
+| `loadRecoveryOptions(client)`                                                | Whether the instance offers recovery codes and self-service account recovery                                                                            |
+| `generateRecoveryCodesWithStepUp({ client, verifyStepUp })`                  | Generates a set of recovery codes, stepping up first when the API asks for it                                                                           |
+| `recoveryCancelTokenFromHash(hash)`, `cancelRecoveryFromLink(client, token)` | The cancel page a recovery notice links to                                                                                                              |
+| `recoveryErrorMessage(error)`, `recoveryCodesText(codes)`                    | Copy for recovery failures, and a set of codes as a text file                                                                                           |
+| `passkeyKind`, `passkeyDisplayName`                                          | How a passkey management screen labels a credential                                                                                                     |
+| `isValidEmail`, `isValidPhoneNumber`, `parseUserAgent`, `formatCountdown`    | Small shared helpers                                                                                                                                    |
 
 None of them store a token. In a browser the session lives in HttpOnly cookies the
 server adapter sets; the only things written to browser storage are the id of the

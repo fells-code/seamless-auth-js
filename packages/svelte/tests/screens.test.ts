@@ -17,6 +17,8 @@ import type { AuthScreen } from '../src/navigation';
 import {
   confirmationRequired,
   createAdapter,
+  heldOnOtherDevice,
+  heldOnRequestingDevice,
   passkeyPort,
   signedIn,
   signedOut,
@@ -360,6 +362,76 @@ describe('magic link screens', () => {
     expect(adapter.called('POST', '/magic-link/verify/t-refused/confirm')).toHaveLength(
       1
     );
+  });
+
+  describe('the code in the link fragment', () => {
+    afterEach(() => window.history.replaceState(null, '', '/'));
+
+    it('is stripped from the address and sent, without asking, on the requesting device', async () => {
+      window.history.replaceState(null, '', '/verify-magiclink?token=t-same#code=c0de');
+
+      const { adapter } = await open(
+        'verifyMagicLink',
+        {
+          'GET /users/me': signedIn,
+          'GET /magic-link/verify/t-same': heldOnRequestingDevice,
+          'POST /magic-link/verify/t-same/confirm': ok,
+        },
+        { query: 'token=t-same' }
+      );
+
+      expect(window.location.search).toBe('');
+      expect(window.location.hash).toBe('');
+
+      await waitSettled();
+
+      expect(bodyOf(adapter, 'POST', '/magic-link/verify/t-same/confirm')).toEqual({
+        code: 'c0de',
+      });
+      expect(text()).toContain('Login verified. Redirecting...');
+      expect(text()).not.toContain('Confirm this sign-in');
+    });
+
+    it('asks on another device, then confirms with the code', async () => {
+      window.history.replaceState(null, '', '/verify-magiclink?token=t-other#code=c0de');
+
+      const { adapter } = await open(
+        'verifyMagicLink',
+        {
+          'GET /magic-link/verify/t-other': heldOnOtherDevice,
+          'POST /magic-link/verify/t-other/confirm': ok,
+        },
+        { query: 'token=t-other' }
+      );
+      await waitSettled();
+
+      expect(heading()).toBe('Confirm this sign-in');
+      await click('Yes, sign in that device');
+      await waitSettled();
+
+      expect(bodyOf(adapter, 'POST', '/magic-link/verify/t-other/confirm')).toEqual({
+        code: 'c0de',
+      });
+    });
+
+    it('reports a code the API refuses', async () => {
+      window.history.replaceState(null, '', '/verify-magiclink?token=t-wrong#code=bad');
+
+      await open(
+        'verifyMagicLink',
+        {
+          'GET /magic-link/verify/t-wrong': heldOnRequestingDevice,
+          'POST /magic-link/verify/t-wrong/confirm': {
+            status: 400,
+            body: { error: 'Invalid' },
+          },
+        },
+        { query: 'token=t-wrong' }
+      );
+      await waitSettled();
+
+      expect(text()).toContain('Failed to verify token');
+    });
   });
 
   it('says to go back when the link was opened elsewhere, and reports failures', async () => {

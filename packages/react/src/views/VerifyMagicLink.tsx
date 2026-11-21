@@ -12,14 +12,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   confirmMagicLinkSignIn,
   finishMagicLinkSignIn,
-  getMagicLinkConfirmation,
   type MagicLinkConfirmation,
   magicLinkConfirmationPrompt,
+  type MagicLinkVerification,
+  takeMagicLinkParams,
+  verifyMagicLinkSignIn,
 } from '@seamless-auth/client';
 
 import styles from '@/styles/verifyMagiclink.module.css';
-
-type Verification = ReturnType<ReturnType<typeof useAuthClient>['verifyMagicLink']>;
 
 /**
  * Where an emailed magic link lands.
@@ -31,14 +31,20 @@ type Verification = ReturnType<ReturnType<typeof useAuthClient>['verifyMagicLink
  * the same browser, which holds the same pre-auth cookie.
  *
  * Opened on a device other than the one that asked for it, the link is held
- * rather than used, and the screen asks whether to sign that device in.
+ * rather than used, and the screen asks whether to sign that device in. On the
+ * device that asked for it, the screen confirms without asking.
  */
 const VerifyMagicLink: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  // Read once: the query is dropped below, and the token is still needed to
-  // confirm a sign-in held for another device.
-  const [token] = useState(() => searchParams.get('token'));
+  // Read once, during the first render, so the code leaves the address bar
+  // before effects or other scripts read it. Both values are still needed to
+  // confirm a sign-in held for another device. The router's query covers a
+  // memory router, where the window's address is not the route.
+  const [{ token, code }] = useState(() => {
+    const taken = takeMagicLinkParams();
+    return { token: searchParams.get('token') ?? taken.token, code: taken.code };
+  });
 
   const [error, setError] = useState('');
   const [outcome, setOutcome] = useState<'signed-in' | 'elsewhere' | null>(null);
@@ -54,9 +60,14 @@ const VerifyMagicLink: React.FC = () => {
   // A link can be used once. Strict Mode runs this effect twice in development,
   // and a second request would find the link spent and report a failure, so the
   // remount waits on the first request instead of sending another.
-  const verification = useRef<{ token: string; result: Verification } | null>(null);
+  const verification = useRef<{
+    token: string;
+    result: Promise<MagicLinkVerification>;
+  } | null>(null);
 
-  // The token is a one-time secret; keep it out of history and Referers.
+  // The token is a one-time secret; keep it out of history and Referers. This
+  // also brings the router in line with the address `takeMagicLinkParams()`
+  // already cleaned.
   useEffect(() => {
     if (searchParams.has('token')) {
       setSearchParams(new URLSearchParams(), { replace: true });
@@ -77,22 +88,24 @@ const VerifyMagicLink: React.FC = () => {
       }
 
       if (verification.current?.token !== token) {
-        verification.current = { token, result: authClient.verifyMagicLink(token) };
+        verification.current = {
+          token,
+          result: verifyMagicLinkSignIn({ client: authClient, token, code }),
+        };
       }
 
-      const { error } = await verification.current.result;
+      const verified = await verification.current.result;
 
       if (!mounted) {
         return;
       }
 
-      if (error) {
-        const held = getMagicLinkConfirmation(error);
-        if (held) {
-          setConfirmation(held);
-          return;
-        }
+      if (verified.status === 'confirmation-required') {
+        setConfirmation(verified.confirmation);
+        return;
+      }
 
+      if (verified.status === 'failed') {
         console.error('Failed to verify token');
         setError('Failed to verify token');
         return;
@@ -130,7 +143,7 @@ const VerifyMagicLink: React.FC = () => {
         clearTimeout(redirectTimeout);
       }
     };
-  }, [token, authClient, navigate, refreshSession]);
+  }, [token, code, authClient, navigate, refreshSession]);
 
   const confirm = async () => {
     if (!token || decision === 'confirming') return;
@@ -138,7 +151,7 @@ const VerifyMagicLink: React.FC = () => {
     setDecision('confirming');
     setConfirmError('');
 
-    const { error } = await confirmMagicLinkSignIn({ client: authClient, token });
+    const { error } = await confirmMagicLinkSignIn({ client: authClient, token, code });
 
     if (error) {
       setDecision('pending');

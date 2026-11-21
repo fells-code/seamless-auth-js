@@ -342,8 +342,14 @@ export interface SeamlessAuthClient {
   /**
    * Approves a link `verifyMagicLink()` held for confirmation. This signs in
    * the device that asked for the link, through its poll, not this one.
+   *
+   * `code` is the value the link carries in its fragment (`#code=`). Newer
+   * APIs refuse a confirm without it, and spend the link on a wrong one.
    */
-  confirmMagicLink: (token: string) => Promise<SeamlessAuthResult<MessageResult>>;
+  confirmMagicLink: (
+    token: string,
+    code?: string
+  ) => Promise<SeamlessAuthResult<MessageResult>>;
   listOAuthProviders: () => Promise<SeamlessAuthResult<OAuthProvidersResult>>;
   getPublicSystemConfig: () => Promise<SeamlessAuthResult<PublicSystemConfigResult>>;
   startOAuthLogin: (
@@ -823,11 +829,11 @@ export const createSeamlessAuthClient = (
         'Failed to verify the magic link.'
       ),
 
-    confirmMagicLink: token =>
+    confirmMagicLink: (token, code) =>
       requestResult<MessageResult>(
         fetchWithAuth(`/magic-link/verify/${encodeURIComponent(token)}/confirm`, {
           method: 'POST',
-          body: JSON.stringify({}),
+          body: JSON.stringify(code === undefined ? {} : { code }),
         }),
         'Failed to confirm the magic link.'
       ),
