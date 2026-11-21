@@ -93,20 +93,21 @@ Mount each sign-in screen at its route:
 <SaLogin />
 ```
 
-| Option                     | Default          | Purpose                                                     |
-| -------------------------- | ---------------- | ----------------------------------------------------------- |
-| `apiHost`                  | required         | Origin of the server adapter                                |
-| `basePath`                 | `/auth`          | Where the adapter is mounted                                |
-| `magicLinkRedirectUri`     | the deployment's | Where an emailed magic link lands                           |
-| `autoDetectPreviousSignIn` | `true`           | Open the login screen on Sign In for a returning browser    |
-| `initialSession`           | none             | A session the server already resolved                       |
-| `ports`                    | browser          | `passkeys` and `oauthRedirect` ports                        |
-| `fetch`                    | global `fetch`   | The fetch auth requests go through                          |
-| `trustedOrigins`           | none             | Other origins of yours that may receive the session cookies |
-| `injectStyles`             | `true`           | Whether the screens add their stylesheet to the page        |
-| `cspNonce`                 | none             | A CSP nonce for that stylesheet                             |
-| `signedInPath`             | `/`              | Where the bundled screens go after sign-in                  |
-| `loginPath`                | `/login`         | Where `requireAuth` sends someone signed out                |
+| Option                     | Default             | Purpose                                                     |
+| -------------------------- | ------------------- | ----------------------------------------------------------- |
+| `apiHost`                  | required            | Origin of the server adapter                                |
+| `basePath`                 | `/auth`             | Where the adapter is mounted                                |
+| `magicLinkRedirectUri`     | the deployment's    | Where an emailed magic link lands                           |
+| `autoDetectPreviousSignIn` | `true`              | Open the login screen on Sign In for a returning browser    |
+| `initialSession`           | none                | A session the server already resolved                       |
+| `ports`                    | browser             | `passkeys` and `oauthRedirect` ports                        |
+| `fetch`                    | global `fetch`      | The fetch auth requests go through                          |
+| `trustedOrigins`           | none                | Other origins of yours that may receive the session cookies |
+| `injectStyles`             | `true`              | Whether the screens add their stylesheet to the page        |
+| `cspNonce`                 | none                | A CSP nonce for that stylesheet                             |
+| `signedInPath`             | `/`                 | Where the bundled screens go after sign-in                  |
+| `loginPath`                | `/login`            | Where `requireAuth` sends someone signed out                |
+| `enrollmentPath`           | `/register-passkey` | Where `requireAuth` sends a recovery session                |
 
 ## Reading session state
 
@@ -160,10 +161,10 @@ and hiding UI. They are for UI only: the server must still enforce. They reflect
 `@seamless-auth/svelte/kit` exports `load` functions. They wait for the session to be read before
 deciding, so reloading a protected page does not bounce a signed-in user to the login screen.
 
-| Guard                          | Admits                                    | Otherwise                                                                                                             |
-| ------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `requireAuth(auth, options?)`  | A signed-in user, with `roles` when given | Redirects to `redirectTo` (default `loginPath`), or `forbiddenRedirectTo` (default `signedInPath`) for a missing role |
-| `requireGuest(auth, options?)` | Someone signed out                        | Redirects to `redirectTo` (default `signedInPath`)                                                                    |
+| Guard                          | Admits                                    | Otherwise                                                                                                                                                                                       |
+| ------------------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `requireAuth(auth, options?)`  | A signed-in user, with `roles` when given | Redirects to `redirectTo` (default `loginPath`), `enrollmentRedirectTo` (default `enrollmentPath`) for a recovery session, or `forbiddenRedirectTo` (default `signedInPath`) for a missing role |
+| `requireGuest(auth, options?)` | Someone signed out                        | Redirects to `redirectTo` (default `signedInPath`)                                                                                                                                              |
 
 The guards register a dependency on the session and on the URL, so they run again on every
 navigation and whenever the session changes (a sign-out in another tab, an expired session, a

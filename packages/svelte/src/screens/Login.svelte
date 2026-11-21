@@ -27,6 +27,11 @@
   let chosenMode = $state<'login' | 'register' | null>(null);
   const mode = $derived(chosenMode ?? (auth.hasSignedInBefore ? 'login' : 'register'));
 
+  // A recovery session can do nothing but enroll a factor, so it goes straight there.
+  $effect(() => {
+    if (auth.recoverySession) void navigator.toScreen('registerPasskey');
+  });
+
   let identifier = $state('');
   let email = $state('');
   let identifierError = $state('');

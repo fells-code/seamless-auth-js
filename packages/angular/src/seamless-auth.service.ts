@@ -178,6 +178,11 @@ export class SeamlessAuth {
     return this.config.loginPath ?? '/login';
   }
 
+  /** Where `requireAuth` sends a recovery session. */
+  get enrollmentPath(): string {
+    return this.config.enrollmentPath ?? '/register-passkey';
+  }
+
   /**
    * A fetch for the application's own API that carries the session cookies. A
    * path resolves on `apiHost`. Only `apiHost` and `trustedOrigins` receive the
@@ -242,6 +247,10 @@ export class SeamlessAuth {
     this.session.actions.login(...args);
   readonly handlePasskeyLogin: AuthSessionActions['handlePasskeyLogin'] = () =>
     this.session.actions.handlePasskeyLogin();
+  readonly redeemRecoveryCode: AuthSessionActions['redeemRecoveryCode'] = code =>
+    this.session.actions.redeemRecoveryCode(code);
+  readonly completeAccountRecovery: AuthSessionActions['completeAccountRecovery'] = () =>
+    this.session.actions.completeAccountRecovery();
   readonly registerPasskey: AuthSessionActions['registerPasskey'] = input =>
     this.session.actions.registerPasskey(input);
   readonly refreshSession: AuthSessionActions['refreshSession'] = options =>

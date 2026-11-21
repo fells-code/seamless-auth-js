@@ -13,7 +13,12 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { defineComponent, h, ref } from 'vue';
 import { createMemoryHistory, createRouter, RouterView, type Router } from 'vue-router';
 
-import { createSeamlessAuth, SaAuthenticatorAppSettings } from '../src';
+import {
+  createSeamlessAuth,
+  SaAuthenticatorAppSettings,
+  type SeamlessAuth,
+} from '../src';
+import { SEAMLESS_AUTH_KEY } from '../src/plugin';
 import { createSeamlessAuthRoutes, SaOtpInput } from '../src/router';
 import {
   confirmationRequired,
@@ -1075,5 +1080,28 @@ describe('authenticator app settings', () => {
     expect(bodyOf(adapter, 'POST', '/totp/disable')).toEqual({ code: '111111' });
     expect(text()).toContain('Authenticator app turned off.');
     expect(button('Set up authenticator app')).toBeDefined();
+  });
+});
+
+describe('recovery session on the login screen', () => {
+  it('goes straight to passkey enrollment', async () => {
+    await open('/login', { 'GET /users/me': recovering });
+
+    expect(router.currentRoute.value.path).toBe('/register-passkey');
+  });
+
+  it('goes there once a session turns into a recovery session', async () => {
+    let session: AdapterReply = signedOut;
+    await open('/login', { 'GET /users/me': () => session });
+    expect(router.currentRoute.value.path).toBe('/login');
+
+    session = recovering;
+    const auth = wrapper.vm.$.appContext.provides[
+      SEAMLESS_AUTH_KEY as symbol
+    ] as SeamlessAuth;
+    await auth.refreshSession();
+    await settle();
+
+    expect(router.currentRoute.value.path).toBe('/register-passkey');
   });
 });

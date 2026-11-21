@@ -9,6 +9,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   linkedSignal,
   signal,
@@ -162,6 +163,13 @@ export class SaLogin {
   });
 
   constructor() {
+    // A recovery session can do nothing but enroll a factor, so it goes straight there.
+    effect(() => {
+      if (this.auth.recoverySession()) {
+        void this.navigation.toScreen(authRoutePaths.registerPasskey);
+      }
+    });
+
     afterNextRender(() => {
       void this.auth.loadLoginMethods();
       void this.auth.checkPasskeySupport();

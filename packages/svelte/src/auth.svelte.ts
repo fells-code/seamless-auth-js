@@ -55,6 +55,8 @@ export class SeamlessAuth implements AuthSessionActions {
   readonly signedInPath: string;
   /** Where `requireAuth` sends someone who is signed out. */
   readonly loginPath: string;
+  /** Where `requireAuth` sends a recovery session. */
+  readonly enrollmentPath: string;
 
   constructor(config: SeamlessAuthConfig) {
     this.#browser = isBrowser();
@@ -85,6 +87,7 @@ export class SeamlessAuth implements AuthSessionActions {
     this.styles = { inject: config.injectStyles ?? true, nonce: config.cspNonce };
     this.signedInPath = config.signedInPath ?? '/';
     this.loginPath = config.loginPath ?? '/login';
+    this.enrollmentPath = config.enrollmentPath ?? '/register-passkey';
 
     // A server render shows what the server knows; the browser reads the rest
     // as soon as it runs.

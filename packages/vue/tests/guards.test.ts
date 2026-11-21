@@ -14,7 +14,9 @@ import { createAdapter, signedIn, signedOut } from '../../../test-support/fakeAd
 
 const Page = defineComponent({ setup: () => () => h('p', 'page') });
 
-async function visitAll(session: typeof signedIn, urls: string[]) {
+const recovering = { body: { ...(signedIn.body as object), recovery: true } };
+
+async function visitAll(session: typeof signedIn | typeof recovering, urls: string[]) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -31,6 +33,13 @@ async function visitAll(session: typeof signedIn, urls: string[]) {
         path: '/billing',
         component: Page,
         beforeEnter: requireAuth({ roles: 'org:owner', forbiddenRedirectTo: '/denied' }),
+      },
+      { path: '/register-passkey', component: Page, beforeEnter: authGuard },
+      { path: '/enroll', component: Page },
+      {
+        path: '/settings',
+        component: Page,
+        beforeEnter: requireAuth({ enrollmentRedirectTo: '/enroll' }),
       },
     ],
   });
@@ -70,5 +79,23 @@ describe('guards', () => {
       '/',
       '/',
     ]);
+  });
+
+  it('sends a recovery session to factor enrollment, roles or not', async () => {
+    expect(await visitAll(recovering, ['/', '/org', '/billing'])).toEqual([
+      '/register-passkey',
+      '/register-passkey',
+      '/register-passkey',
+    ]);
+  });
+
+  it('admits a recovery session to a guarded enrollment route without looping', async () => {
+    expect(await visitAll(recovering, ['/register-passkey'])).toEqual([
+      '/register-passkey',
+    ]);
+  });
+
+  it('takes the enrollment route from the guard options', async () => {
+    expect(await visitAll(recovering, ['/settings'])).toEqual(['/enroll']);
   });
 });

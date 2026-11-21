@@ -37,6 +37,15 @@ export const SaLogin = defineComponent({
       if (seen) mode.value = 'login';
     });
 
+    // A recovery session can do nothing but enroll a factor, so it goes straight there.
+    watch(
+      auth.recoverySession,
+      recovery => {
+        if (recovery) void navigation.toScreen('registerPasskey');
+      },
+      { immediate: true }
+    );
+
     const identifier = ref('');
     const email = ref('');
     const identifierError = ref('');

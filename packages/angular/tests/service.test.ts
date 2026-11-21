@@ -74,6 +74,34 @@ describe('SeamlessAuth', () => {
     expect(Object.keys(localStorage)).toEqual(['seamlessauth_seen']);
   });
 
+  it('refreshes the session after a recovery code or a completed recovery', async () => {
+    const recovery = {
+      body: { message: 'Success', recovery: true, nextStep: 'enroll_passkey' },
+    };
+    const { auth, adapter } = setup({
+      'GET /users/me': signedIn,
+      'POST /recovery-codes/redeem': recovery,
+      'POST /recovery/complete': recovery,
+    });
+    await auth.whenSettled();
+    expect(auth.recoverySession()).toBe(false);
+
+    await expect(auth.redeemRecoveryCode('ABCDE-FGHIJ')).resolves.toMatchObject({
+      error: null,
+    });
+    expect(auth.recoverySession()).toBe(true);
+    expect(adapter.called('GET', '/users/me')).toHaveLength(2);
+
+    await expect(auth.completeAccountRecovery()).resolves.toMatchObject({ error: null });
+    expect(adapter.called('GET', '/users/me')).toHaveLength(3);
+  });
+
+  it('defaults the enrollment path and takes it from the config', () => {
+    expect(setup().auth.enrollmentPath).toBe('/register-passkey');
+    TestBed.resetTestingModule();
+    expect(setup({}, { enrollmentPath: '/enroll' }).auth.enrollmentPath).toBe('/enroll');
+  });
+
   it('settles signed out when there is no session', async () => {
     const { auth } = setup({ 'GET /users/me': signedOut });
     const settled = await auth.whenSettled();
